@@ -1,0 +1,3 @@
+# The website is the Markdown pages in this folder. The app's code in app/ isn't part of it.
+exclude:
+  - app
