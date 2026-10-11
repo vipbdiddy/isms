@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Ism's",
+    "slug": "isms",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vipbdiddy.isms"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F6EFE6",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.vipbdiddy.isms"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ism's uses your photos so you can add a picture of your loved one.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "scheme": "isms"
+  }
+}
