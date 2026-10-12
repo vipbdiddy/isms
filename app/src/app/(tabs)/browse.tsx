@@ -12,27 +12,27 @@ import { useScope } from '../../lib/useScope';
 
 export default function Browse() {
   const { topic } = useLocalSearchParams<{ topic?: string }>();
-  const { isms, lovedOnes, userId, getLovedOne, loading, refresh } = useStore();
+  const { isms, lovedOnes, viewer, getLovedOne, loading, refresh } = useStore();
   const [scope, setScope] = useScope();
   const [topics, setTopics] = useState<string[]>(topic ? [topic] : []);
   const [search, setSearch] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
 
-  // Arriving from a topic link on Today narrows to that topic.
+  // Arriving from a topic link on Home narrows to that topic.
   useEffect(() => {
     if (topic) setTopics([topic]);
   }, [topic]);
 
   const results = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return visibleIsms(isms, lovedOnes, userId, scope).filter(
+    return visibleIsms(isms, lovedOnes, viewer, scope).filter(
       (ism) =>
         matchesKind(ism, kind) &&
         (topics.length === 0 || ism.topics.some((t) => topics.includes(t))) &&
         (!q ||
           `${ism.title ?? ''} ${ism.text} ${ism.context ?? ''} ${getLovedOne(ism.lovedOneId)?.name ?? ''}`.toLowerCase().includes(q)),
     );
-  }, [isms, lovedOnes, userId, scope, kind, topics, search, getLovedOne]);
+  }, [isms, lovedOnes, viewer, scope, kind, topics, search, getLovedOne]);
 
   return (
     <FlatList
@@ -57,9 +57,9 @@ export default function Browse() {
       ListEmptyComponent={
         <Empty
           title={
-            scope === 'mine'
-              ? 'Nothing from your loved ones matches. Add more, or switch to Everyone.'
-              : 'Nothing matches yet.'
+            scope === 'everyone'
+              ? 'Nothing matches yet.'
+              : `Nothing from ${scope === 'mine' ? 'your loved ones' : 'you and your friends'} matches. Add more, or switch to Everyone.`
           }
         />
       }

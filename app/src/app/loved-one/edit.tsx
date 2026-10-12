@@ -1,16 +1,21 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '../../components/Avatar';
-import { Button, DangerButton, ErrorNote, Field, styles } from '../../components/ui';
+import { SHARED_WITH } from '../../components/LovedOneRow';
+import { Button, DangerButton, ErrorNote, Field, TextButton, VisibilityPicker, styles } from '../../components/ui';
+import { canSeeLovedOne } from '../../lib/advice';
+import { findPossibleDuplicates } from '../../lib/duplicates';
 import { pickPhoto, type PickedPhoto } from '../../lib/photos';
+import { COMMUNITY_OWNER } from '../../lib/seed';
 import { useStore } from '../../lib/store';
-import { colors } from '../../lib/theme';
+import { cardStyle, colors, space } from '../../lib/theme';
+import type { LovedOne, Visibility } from '../../lib/types';
 
 export default function EditLovedOne() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { getLovedOne, addLovedOne, updateLovedOne, deleteLovedOne, userId } = useStore();
+  const { getLovedOne, addLovedOne, updateLovedOne, deleteLovedOne, userId, lovedOnes, viewer } = useStore();
   const existing = id ? getLovedOne(id) : undefined;
   const editable = !existing || existing.ownerId === userId;
 
@@ -21,9 +26,25 @@ export default function EditLovedOne() {
   const [obituary, setObituary] = useState(existing?.obituary ?? '');
   // undefined: keep the current photo; null: remove it; a PickedPhoto: replace it.
   const [photo, setPhoto] = useState<PickedPhoto | null>();
-  const [isPublic, setIsPublic] = useState(existing?.visibility === 'public');
+  const [visibility, setVisibility] = useState<Visibility>(existing?.visibility ?? 'private');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  // People they've said "No, this is someone else" to.
+  const [notThem, setNotThem] = useState<string[]>([]);
+
+  // When adding someone new, look for them among the people already here that this person may see.
+  const lookalikes = useMemo(
+    () =>
+      existing
+        ? []
+        : findPossibleDuplicates(
+            { name, years, obituary },
+            lovedOnes.filter(
+              (l) => l.ownerId !== COMMUNITY_OWNER && !notThem.includes(l.id) && canSeeLovedOne(l, viewer),
+            ),
+          ),
+    [existing, name, years, obituary, lovedOnes, notThem, viewer],
+  );
 
   if (!editable || !userId) return null;
 
@@ -45,7 +66,7 @@ export default function EditLovedOne() {
       years: years.trim() || undefined,
       about: about.trim() || undefined,
       obituary: obituary.trim() || undefined,
-      visibility: isPublic ? ('public' as const) : ('private' as const),
+      visibility,
     };
     setSaving(true);
     setError(undefined);
@@ -100,16 +121,16 @@ export default function EditLovedOne() {
         style={{ minHeight: 160 }}
       />
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.label}>Share their memories with everyone</Text>
-          <Text style={styles.hint}>
-            Off: only you can see them. On: anyone using the app can see their profile, quotes and stories. You can
-            keep single quotes or stories private.
-          </Text>
-        </View>
-        <Switch value={isPublic} onValueChange={setIsPublic} trackColor={{ true: colors.sage }} />
-      </View>
+      <VisibilityPicker value={visibility} onChange={setVisibility} />
+
+      {lookalikes.length > 0 && (
+        <LookalikeCard
+          people={lookalikes}
+          userId={userId}
+          onOpen={(id) => router.replace({ pathname: '/loved-one/[id]', params: { id } })}
+          onNotThem={() => setNotThem((ids) => [...ids, ...lookalikes.map((l) => l.id)])}
+        />
+      )}
 
       {error ? <ErrorNote message={error} /> : null}
       <Button title={saving ? 'Saving…' : existing ? 'Save' : 'Add'} onPress={save} disabled={!name.trim() || saving} />
@@ -132,3 +153,51 @@ export default function EditLovedOne() {
     </ScrollView>
   );
 }
+
+/** "Is this who you're looking for?": people already in Ism's who look like the one being added. */
+function LookalikeCard({
+  people,
+  userId,
+  onOpen,
+  onNotThem,
+}: {
+  people: LovedOne[];
+  userId: string;
+  onOpen: (id: string) => void;
+  onNotThem: () => void;
+}) {
+  const { sharedBy } = useStore();
+  const one = people.length === 1;
+  return (
+    <View style={local.card} accessibilityRole="alert">
+      <Text style={local.title}>{one ? 'Is this who you’re looking for?' : 'Is one of these who you’re looking for?'}</Text>
+      {people.map((person) => {
+        const mine = person.ownerId === userId;
+        return (
+          <View key={person.id} style={local.person}>
+            <Avatar lovedOne={person} size={48} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={local.name}>{person.name}</Text>
+              {person.relationship || person.years ? (
+                <Text style={styles.muted}>{[person.relationship, person.years].filter(Boolean).join(' · ')}</Text>
+              ) : null}
+              <Text style={local.whose}>
+                {mine ? `You already added them · ${SHARED_WITH[person.visibility]}` : sharedBy(person.ownerId)}
+              </Text>
+              <TextButton title={mine ? 'Yes, open their page' : 'Yes, see their memories'} onPress={() => onOpen(person.id)} />
+            </View>
+          </View>
+        );
+      })}
+      <Button title={one ? 'No, this is someone else' : 'No, none of these'} variant="secondary" onPress={onNotThem} />
+    </View>
+  );
+}
+
+const local = StyleSheet.create({
+  card: { ...cardStyle, padding: space.lg, gap: space.md, borderColor: colors.accent, borderWidth: 2 },
+  title: { fontSize: 17, fontWeight: '700', color: colors.ink },
+  person: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
+  name: { fontSize: 16, fontWeight: '600', color: colors.ink },
+  whose: { fontSize: 13, color: colors.accent, fontWeight: '500' },
+});

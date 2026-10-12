@@ -1,3 +1,5 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
@@ -7,7 +9,9 @@ import { colors } from '../lib/theme';
 
 function Root() {
   const { ready } = useStore();
-  if (!ready) {
+  // Load the icons before showing anything, so they don't pop in. If they fail, carry on without them.
+  const [iconsLoaded, iconsError] = useFonts(Ionicons.font);
+  if (!ready || (!iconsLoaded && !iconsError)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.accent} />
@@ -19,7 +23,7 @@ function Root() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.accent,
-        headerTitleStyle: { color: colors.ink },
+        headerTitleStyle: { color: colors.ink, fontWeight: '700' },
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
       }}>
@@ -28,6 +32,7 @@ function Root() {
       <Stack.Screen name="loved-one/edit" options={{ presentation: 'modal', title: 'Loved one' }} />
       <Stack.Screen name="ism/edit" options={{ presentation: 'modal', title: 'Add a memory' }} />
       <Stack.Screen name="account" options={{ presentation: 'modal', title: 'Account' }} />
+      <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="auth-callback" options={{ title: 'Signing in' }} />
       <Stack.Screen name="reset-password" options={{ title: 'New password' }} />
     </Stack>

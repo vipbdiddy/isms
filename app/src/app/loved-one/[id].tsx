@@ -5,27 +5,33 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { IsmCard } from '../../components/IsmCard';
 import { Button, Empty, KindToggle, styles } from '../../components/ui';
-import { canSee, matchesKind } from '../../lib/advice';
+import { canSee, canSeeLovedOne, matchesKind } from '../../lib/advice';
 import { useStore } from '../../lib/store';
-import { colors, fonts, space } from '../../lib/theme';
-import type { KindFilter } from '../../lib/types';
+import { cardStyle, colors, space } from '../../lib/theme';
+import type { KindFilter, Visibility } from '../../lib/types';
+
+const OWN_STATUS: Record<Visibility, string> = {
+  private: 'Private. Only you can see their quotes and stories.',
+  friends: 'Shared with your friends. They can see their quotes and stories.',
+  public: 'Shared with everyone. Anyone using Ism’s can see their quotes and stories.',
+};
 
 /** Obituaries longer than this start collapsed. */
 const OBITUARY_PREVIEW_LINES = 5;
 
 export default function LovedOneScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getLovedOne, isms, userId } = useStore();
+  const { getLovedOne, isms, userId, viewer, sharedBy } = useStore();
   const [kind, setKind] = useState<KindFilter>('all');
   const [obituaryOpen, setObituaryOpen] = useState(false);
   const lovedOne = getLovedOne(id);
 
-  if (!lovedOne || (lovedOne.ownerId !== userId && lovedOne.visibility !== 'public')) {
+  if (!lovedOne || !canSeeLovedOne(lovedOne, viewer)) {
     return <Empty title="We couldn't find this person." />;
   }
 
   const mine = lovedOne.ownerId === userId;
-  const theirs = isms.filter((i) => i.lovedOneId === id && canSee(i, lovedOne, userId));
+  const theirs = isms.filter((i) => i.lovedOneId === id && canSee(i, lovedOne, viewer));
   const shown = theirs.filter((i) => matchesKind(i, kind));
   const add = (k: 'quote' | 'story') =>
     router.push({ pathname: '/ism/edit', params: { lovedOneId: lovedOne.id, kind: k } });
@@ -52,11 +58,7 @@ export default function LovedOneScreen() {
         <Text style={styles.muted}>{[lovedOne.relationship, lovedOne.years].filter(Boolean).join(' · ')}</Text>
         {lovedOne.about ? <Text style={[styles.body, { textAlign: 'center' }]}>{lovedOne.about}</Text> : null}
         <Text style={[styles.muted, { textAlign: 'center' }]}>
-          {mine
-            ? lovedOne.visibility === 'public'
-              ? 'Shared publicly. Other people can see their quotes and stories.'
-              : 'Private. Only you can see their quotes and stories.'
-            : 'Shared by their family.'}
+          {mine ? OWN_STATUS[lovedOne.visibility] : `${sharedBy(lovedOne.ownerId)}.`}
         </Text>
       </View>
 
@@ -75,10 +77,10 @@ export default function LovedOneScreen() {
       {mine && (
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           <View style={{ flex: 1 }}>
-            <Button title="+ Quote" onPress={() => add('quote')} />
+            <Button title="Quote" icon="add" onPress={() => add('quote')} />
           </View>
           <View style={{ flex: 1 }}>
-            <Button title="+ Story" onPress={() => add('story')} />
+            <Button title="Story" icon="add" onPress={() => add('story')} />
           </View>
         </View>
       )}
@@ -103,7 +105,7 @@ export default function LovedOneScreen() {
               <Text
                 style={[styles.muted, { textAlign: 'right', color: colors.accent }]}
                 onPress={() => router.push({ pathname: '/ism/edit', params: { lovedOneId: lovedOne.id, id: ism.id } })}>
-                {ism.keepPrivate && lovedOne.visibility === 'public' ? 'Private · ' : ''}Edit
+                {ism.keepPrivate && lovedOne.visibility !== 'private' ? 'Private · ' : ''}Edit
               </Text>
             )}
           </View>
@@ -115,15 +117,8 @@ export default function LovedOneScreen() {
 
 const local = StyleSheet.create({
   header: { alignItems: 'center', gap: space.sm },
-  name: { fontFamily: fonts.quote, fontSize: 28, color: colors.ink, textAlign: 'center' },
-  obituary: {
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    padding: space.lg,
-    gap: space.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  obituaryText: { fontFamily: fonts.quote, fontSize: 16, lineHeight: 25, color: colors.ink },
+  name: { fontSize: 28, fontWeight: '700', color: colors.ink, textAlign: 'center', letterSpacing: -0.4 },
+  obituary: { ...cardStyle, padding: space.lg, gap: space.sm },
+  obituaryText: { fontSize: 16, lineHeight: 25, color: colors.ink },
   more: { fontSize: 14, fontWeight: '600', color: colors.accent },
 });
