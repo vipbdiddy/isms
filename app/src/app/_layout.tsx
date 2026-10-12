@@ -33,6 +33,7 @@ function Root() {
       <Stack.Screen name="ism/edit" options={{ presentation: 'modal', title: 'Add a memory' }} />
       <Stack.Screen name="account" options={{ presentation: 'modal', title: 'Account' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+      <Stack.Screen name="review" options={{ title: 'Review shared memories' }} />
       <Stack.Screen name="auth-callback" options={{ title: 'Signing in' }} />
       <Stack.Screen name="reset-password" options={{ title: 'New password' }} />
     </Stack>

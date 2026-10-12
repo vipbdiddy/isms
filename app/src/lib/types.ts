@@ -4,6 +4,12 @@ export type Visibility = 'private' | 'friends' | 'public';
 /** Whose words to draw from: only your own loved ones, your friends' too, or everything shared with you. */
 export type Scope = 'mine' | 'friends' | 'everyone';
 
+/**
+ * Whether others may see something shared. Words that might be hurtful wait for a reviewer ('pending');
+ * a reviewer either allows them ('approved') or hides them from everyone but their owner ('removed').
+ */
+export type ReviewStatus = 'ok' | 'pending' | 'approved' | 'removed';
+
 export interface LovedOne {
   id: string;
   ownerId: string;
@@ -19,6 +25,8 @@ export interface LovedOne {
   obituary?: string;
   /** Public loved ones (and their isms) are visible to every user of the app; friends-only ones to the owner's friends. */
   visibility: Visibility;
+  /** Missing for the bundled examples, which are always fine. */
+  reviewStatus?: ReviewStatus;
   createdAt: number;
 }
 
@@ -42,24 +50,37 @@ export interface Ism {
   topics: string[];
   /** Keeps a single ism private even when the loved one is shared. */
   keepPrivate?: boolean;
+  reviewStatus?: ReviewStatus;
   createdAt: number;
 }
 
 /** The fields a person fills in for a loved one. */
-export type LovedOneInput = Omit<LovedOne, 'id' | 'ownerId' | 'createdAt' | 'photoPath' | 'photoUri'>;
+export type LovedOneInput = Omit<LovedOne, 'id' | 'ownerId' | 'createdAt' | 'photoPath' | 'photoUri' | 'reviewStatus'>;
 /** The fields a person fills in for a quote or story. */
-export type IsmInput = Omit<Ism, 'id' | 'ownerId' | 'createdAt'>;
+export type IsmInput = Omit<Ism, 'id' | 'ownerId' | 'createdAt' | 'reviewStatus'>;
 
 export interface Settings {
   displayName: string;
   defaultScope: Scope;
 }
 
-/** The name other people see. Your own profile also carries the code friends use to add you. */
+/** The name other people see. */
 export interface Profile {
   id: string;
   displayName: string;
-  friendCode?: string;
+  /** Your own profile only: whether others can find you by name or in their contacts. */
+  discoverable?: boolean;
+}
+
+/** How you stand with someone: friends, you asked them, they asked you, or neither. */
+export type Relationship = 'friends' | 'sent' | 'received' | 'none';
+
+/** Someone found by name or in your contacts. */
+export interface PersonResult {
+  id: string;
+  displayName: string;
+  mutualFriends: number;
+  relationship: Relationship;
 }
 
 /** A friend, or a request to be friends that hasn't been answered yet. */
@@ -72,7 +93,24 @@ export interface Friendship {
   createdAt: number;
 }
 
-/** What happened when you asked someone to be friends, using their friend code. */
+/** What happened when you asked someone to be friends. */
 export type FriendRequestResult =
-  | { result: 'not_found' | 'self' | 'need_name' }
+  | { result: 'not_found' | 'self' | 'need_name' | 'too_many' }
   | { result: 'sent' | 'already_sent' | 'already_friends' | 'now_friends'; name: string };
+
+/** Something shared that's waiting for a reviewer: held for its words, or reported. */
+export interface ReviewItem {
+  kind: 'ism' | 'loved_one';
+  id: string;
+  lovedOneId: string;
+  lovedOneName: string;
+  ownerName: string;
+  title?: string;
+  body: string;
+  context?: string;
+  visibility: Visibility;
+  reviewStatus: ReviewStatus;
+  reportCount: number;
+  reasons: string[];
+  createdAt: number;
+}

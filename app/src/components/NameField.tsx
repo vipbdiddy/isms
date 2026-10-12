@@ -51,7 +51,7 @@ export function NameField({ label = 'Your name', onSaved }: { label?: string; on
       <Field
         label={label}
         placeholder={userId ? 'The name your friends know you by' : 'So we can say hi'}
-        hint={userId ? 'Your friends see this name. Your email address is never shown.' : undefined}
+        hint={userId ? 'People find you and see you by this name. Your email address is never shown.' : undefined}
         value={draft}
         onChangeText={setDraft}
         onSubmitEditing={save}

@@ -4,8 +4,10 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '../../components/Avatar';
 import { IsmCard } from '../../components/IsmCard';
-import { Button, Empty, KindToggle, styles } from '../../components/ui';
-import { canSee, canSeeLovedOne, matchesKind } from '../../lib/advice';
+import { ReportPanel, ReviewNote } from '../../components/ReportPanel';
+import { Button, Empty, KindToggle, TextButton, styles } from '../../components/ui';
+import { canSee, canSeeLovedOne, isShared, matchesKind } from '../../lib/advice';
+import { COMMUNITY_OWNER } from '../../lib/seed';
 import { useStore } from '../../lib/store';
 import { cardStyle, colors, space } from '../../lib/theme';
 import type { KindFilter, Visibility } from '../../lib/types';
@@ -21,16 +23,27 @@ const OBITUARY_PREVIEW_LINES = 5;
 
 export default function LovedOneScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getLovedOne, isms, userId, viewer, sharedBy } = useStore();
+  const { getLovedOne, isms, userId, viewer, sharedBy, report } = useStore();
   const [kind, setKind] = useState<KindFilter>('all');
   const [obituaryOpen, setObituaryOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reported, setReported] = useState(false);
   const lovedOne = getLovedOne(id);
+
+  if (reported) {
+    return (
+      <Empty title="Thanks for letting us know. They’re hidden for you now, and someone at Ism’s will take a look.">
+        <Button title="Go back" variant="secondary" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      </Empty>
+    );
+  }
 
   if (!lovedOne || !canSeeLovedOne(lovedOne, viewer)) {
     return <Empty title="We couldn't find this person." />;
   }
 
   const mine = lovedOne.ownerId === userId;
+  const canReport = !!userId && !mine && lovedOne.ownerId !== COMMUNITY_OWNER;
   const theirs = isms.filter((i) => i.lovedOneId === id && canSee(i, lovedOne, viewer));
   const shown = theirs.filter((i) => matchesKind(i, kind));
   const add = (k: 'quote' | 'story') =>
@@ -60,7 +73,18 @@ export default function LovedOneScreen() {
         <Text style={[styles.muted, { textAlign: 'center' }]}>
           {mine ? OWN_STATUS[lovedOne.visibility] : `${sharedBy(lovedOne.ownerId)}.`}
         </Text>
+        {canReport && !reporting ? <TextButton title="Report" color={colors.muted} onPress={() => setReporting(true)} /> : null}
       </View>
+      {mine && isShared(undefined, lovedOne) ? <ReviewNote status={lovedOne.reviewStatus} /> : null}
+      {reporting ? (
+        <ReportPanel
+          onCancel={() => setReporting(false)}
+          onReport={async (reason) => {
+            await report({ lovedOneId: lovedOne.id }, reason);
+            setReported(true);
+          }}
+        />
+      ) : null}
 
       {lovedOne.obituary ? (
         <View style={local.obituary}>

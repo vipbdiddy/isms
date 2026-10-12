@@ -62,6 +62,20 @@ test('friends-only loved ones are seen by the owner and their friends, nobody el
   assert.equal(canSee(ism('7', 'friendsOnly', FRIEND, []), friendsOnly, stranger), false);
 });
 
+test('only owners see what waits for a reviewer or was removed', () => {
+  const held = { ...lovedOne('held', FRIEND, 'public'), reviewStatus: 'pending' as const };
+  const allowed = { ...lovedOne('allowed', FRIEND, 'public'), reviewStatus: 'approved' as const };
+  assert.equal(canSeeLovedOne(held, me), false);
+  assert.equal(canSeeLovedOne(held, { userId: FRIEND, friendIds: new Set() }), true);
+  assert.equal(canSeeLovedOne(allowed, me), true);
+  const fine = byId('theirsPublic');
+  assert.equal(canSee(ism('8', 'theirsPublic', 'other', [], 'x', { reviewStatus: 'pending' }), fine, me), false);
+  assert.equal(canSee(ism('9', 'theirsPublic', 'other', [], 'x', { reviewStatus: 'removed' }), fine, me), false);
+  assert.equal(canSee(ism('10', 'theirsPublic', 'other', [], 'x', { reviewStatus: 'approved' }), fine, me), true);
+  assert.equal(canSee(ism('11', 'mine', ME, [], 'x', { reviewStatus: 'removed' }), byId('mine'), me), true);
+  assert.equal(canSee(ism('12', 'held', FRIEND, []), held, me), false);
+});
+
 test('scopes: "mine", then "friends" adds your friends\', then "everyone" adds public ones', () => {
   const all = [
     ism('1', 'mine', ME, []),

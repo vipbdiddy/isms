@@ -1,10 +1,15 @@
 import { TOPICS } from './topics.ts';
-import type { Ism, KindFilter, LovedOne, Scope } from './types.ts';
+import type { Ism, KindFilter, LovedOne, ReviewStatus, Scope } from './types.ts';
 
 /** Who is looking: their id ('' when signed out) and the ids of their friends. */
 export interface Viewer {
   userId: string;
   friendIds: ReadonlySet<string>;
+}
+
+/** Whether others may see something: not while it waits for a reviewer, or after one removed it. */
+export function passedReview(item: { reviewStatus?: ReviewStatus }): boolean {
+  return item.reviewStatus === undefined || item.reviewStatus === 'ok' || item.reviewStatus === 'approved';
 }
 
 /**
@@ -13,6 +18,7 @@ export interface Viewer {
  */
 export function canSeeLovedOne(lovedOne: LovedOne, viewer: Viewer): boolean {
   if (lovedOne.ownerId === viewer.userId) return true;
+  if (!passedReview(lovedOne)) return false;
   if (lovedOne.visibility === 'public') return true;
   return lovedOne.visibility === 'friends' && viewer.friendIds.has(lovedOne.ownerId);
 }
@@ -20,7 +26,12 @@ export function canSeeLovedOne(lovedOne: LovedOne, viewer: Viewer): boolean {
 /** Whether someone may see an ism: always their own; otherwise only if its loved one is shared with them. */
 export function canSee(ism: Ism, lovedOne: LovedOne | undefined, viewer: Viewer): boolean {
   if (ism.ownerId === viewer.userId) return true;
-  return !!lovedOne && !ism.keepPrivate && canSeeLovedOne(lovedOne, viewer);
+  return !!lovedOne && !ism.keepPrivate && passedReview(ism) && canSeeLovedOne(lovedOne, viewer);
+}
+
+/** Whether anyone besides its owner could see this, if it passed review. */
+export function isShared(ism: Ism | undefined, lovedOne: LovedOne): boolean {
+  return lovedOne.visibility !== 'private' && !ism?.keepPrivate;
 }
 
 /** Whether something added by `ownerId` belongs in a scope. Each scope includes the one before it. */

@@ -18,7 +18,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.vipbdiddy.isms"
+      "package": "com.vipbdiddy.isms",
+      "blockedPermissions": [
+        "android.permission.WRITE_CONTACTS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -35,7 +38,22 @@
         }
       ],
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 140,
+          "resizeMode": "contain",
+          "backgroundColor": "#F2F7F6"
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Ism's checks your contacts' email addresses, only when you ask, to find friends who already use Ism's. Your contacts are never uploaded."
+        }
+      ]
     ],
     "scheme": "isms"
   }

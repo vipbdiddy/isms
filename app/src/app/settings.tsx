@@ -1,18 +1,31 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text } from 'react-native';
+import { ScrollView, Switch, Text, View } from 'react-native';
 
 import { NameField } from '../components/NameField';
 import { Button, DangerButton, ErrorNote, ScopeToggle, styles } from '../components/ui';
 import { deleteAccount, signOut } from '../lib/auth';
 import { useStore } from '../lib/store';
+import { colors, space } from '../lib/theme';
 
 export default function SettingsScreen() {
-  const { settings, updateSettings, session, userId } = useStore();
+  const { settings, updateSettings, session, userId, profile, setDiscoverable, isAdmin, reviewCount } = useStore();
   const [error, setError] = useState<string>();
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {isAdmin && (
+        <>
+          <Text style={styles.subheading}>Reviewing</Text>
+          <Button
+            title={reviewCount ? `Review shared memories (${reviewCount})` : 'Review shared memories'}
+            icon="shield-checkmark-outline"
+            variant="secondary"
+            onPress={() => router.push('/review')}
+          />
+        </>
+      )}
+
       <Text style={styles.subheading}>Account</Text>
       {session ? (
         <>
@@ -41,9 +54,33 @@ export default function SettingsScreen() {
       </Text>
 
       <Text style={styles.subheading}>Privacy</Text>
+      {profile ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Let people find me</Text>
+            <Text style={styles.hint}>
+              Others can find you by your name, or in their contacts by your email address. Turn this off to only add
+              friends yourself.
+            </Text>
+          </View>
+          <Switch
+            value={profile.discoverable !== false}
+            onValueChange={(on) =>
+              setDiscoverable(on).catch((e) => {
+                console.warn('Could not save', e);
+                setError('Couldn’t save that. Check your connection and try again.');
+              })
+            }
+            trackColor={{ true: colors.accent, false: colors.border }}
+            thumbColor={colors.card}
+            accessibilityLabel="Let people find me"
+          />
+        </View>
+      ) : null}
       <Text style={styles.muted}>
         Everything you add is private until you share a loved one with your friends or with everyone. Even then, you
-        can keep single quotes or stories private. Friends see your name, never your email address.
+        can keep single quotes or stories private. Shared memories that might hurt someone are checked by Ism’s before
+        others can see them. Other people see your name, never your email address.
       </Text>
 
       {error ? <ErrorNote message={error} /> : null}
