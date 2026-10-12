@@ -165,8 +165,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Only the newest load may update the screen, so a slow one from before a sign-out can't win.
   const latestLoad = useRef(0);
   const lastLoadedAt = useRef(0);
+  // Counts changes made on this phone. A load that was already on its way when something was added,
+  // changed or removed may not include it, so it's thrown away and loaded again.
+  const localChanges = useRef(0);
+  const refreshRef = useRef<() => Promise<void>>(async () => {});
   const refresh = useCallback(async () => {
     const load = ++latestLoad.current;
+    const changesAtStart = localChanges.current;
     setLoading(true);
     try {
       // Friends load separately, so trouble there never hides your own memories.
@@ -185,6 +190,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           )
         : 0;
       if (load !== latestLoad.current) return;
+      if (localChanges.current !== changesAtStart) {
+        void refreshRef.current();
+        return;
+      }
       setLovedOnes(withLinks);
       setIsms(data.isms);
       setSavedIds(data.savedIsmIds);
@@ -210,7 +219,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [userId, withPhotos]);
 
   // Coming back to the app after a while picks up what friends shared in the meantime.
-  const refreshRef = useRef(refresh);
   useEffect(() => {
     refreshRef.current = refresh;
   }, [refresh]);
@@ -268,8 +276,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const names = new Map(profiles.map((p) => [p.id, p.displayName.trim()]));
     if (profile) names.set(profile.id, profile.displayName.trim());
     const nameOf = (id: string) => names.get(id) ?? '';
+    const changedHere = () => {
+      localChanges.current += 1;
+    };
     const replaceLovedOne = async (updated: LovedOne) => {
       const [withPhoto] = await withPhotos([updated]);
+      changedHere();
       setLovedOnes((list) => list.map((l) => (l.id === updated.id ? withPhoto : l)));
     };
 
@@ -307,6 +319,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const photoPath = photo ? await uploadPhoto(owner, photo.base64) : undefined;
         const created = await db.insertLovedOne({ ...input, photoPath });
         const [withPhoto] = await withPhotos([created]);
+        changedHere();
         setLovedOnes((list) => [...list, withPhoto]);
         return withPhoto;
       },
@@ -327,6 +340,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const old = byId.get(id);
         await db.removeLovedOne(id);
         await deletePhoto(old?.photoPath);
+        changedHere();
         setLovedOnes((list) => list.filter((l) => l.id !== id));
         setIsms((list) => list.filter((i) => i.lovedOneId !== id));
       },
@@ -334,6 +348,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addIsm: async (input) => {
         requireUser();
         const created = await db.insertIsm(input);
+        changedHere();
         setIsms((list) => [created, ...list]);
         return created;
       },
@@ -341,12 +356,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateIsm: async (id, patch) => {
         requireUser();
         const updated = await db.patchIsm(id, patch);
+        changedHere();
         setIsms((list) => list.map((i) => (i.id === id ? updated : i)));
       },
 
       deleteIsm: async (id) => {
         requireUser();
         await db.removeIsm(id);
+        changedHere();
         setIsms((list) => list.filter((i) => i.id !== id));
         setSavedIds((list) => list.filter((s) => s !== id));
       },
@@ -362,6 +379,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         if (!userId) return false;
         const saving = !savedIds.includes(ismId);
+        changedHere();
         setSavedIds((list) => (saving ? [ismId, ...list] : list.filter((s) => s !== ismId)));
         db.setSaved(ismId, saving).catch((e) => {
           console.warn('Could not save heart', e);
@@ -421,6 +439,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       report: async (target, reason) => {
         requireUser();
         await db.report(target, reason);
+        changedHere();
         // Leave it a moment so the thank-you can be read, then hide it everywhere.
         setTimeout(() => {
           if (target.ismId) setIsms((list) => list.filter((i) => i.id !== target.ismId));
