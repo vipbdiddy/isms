@@ -1,12 +1,19 @@
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 
 import { readAuthLink } from './authLink';
 import type { SocialProvider } from './config';
 import { supabase } from './supabase';
 
-/** Where links in sign-in emails and social sign-in send people back to: isms://<path>. */
-const backToApp = (path: 'auth-callback' | 'reset-password') => Linking.createURL(path);
+/**
+ * Where links in sign-in emails and social sign-in send people back to: isms://<path> in the phone
+ * apps, or that page of the web version (https://vipbdiddy.github.io/isms/app/<path>).
+ */
+const backToApp = (path: 'auth-callback' | 'reset-password') =>
+  Platform.OS === 'web'
+    ? `${window.location.origin}${process.env.EXPO_BASE_URL ?? ''}/${path}`
+    : Linking.createURL(path);
 
 // A link back into the app carries a one-time code. On Android both the browser hand-off and the
 // app's own link handling can see the same link, so each code is exchanged for a session only once.
@@ -33,10 +40,16 @@ export async function finishAuthLink(link: { code?: string; error?: string }) {
 
 /**
  * Sign in with Google, Apple or Facebook in the phone's browser, then come back to the app.
- * Returns false if the person closed the browser without finishing.
+ * Returns false if the person closed the browser without finishing. The web version instead
+ * leaves for the provider's page, which sends it back to auth-callback.
  */
 export async function signInWithProvider(provider: SocialProvider): Promise<boolean> {
   const redirectTo = backToApp('auth-callback');
+  if (Platform.OS === 'web') {
+    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
+    if (error) throw error;
+    return false;
+  }
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: { redirectTo, skipBrowserRedirect: true },

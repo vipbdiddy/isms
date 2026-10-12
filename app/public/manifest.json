@@ -1,0 +1,14 @@
+{
+  "name": "Ism's",
+  "short_name": "Ism's",
+  "description": "Keep the sayings and stories of the people you've lost.",
+  "start_url": "/isms/app/",
+  "scope": "/isms/app/",
+  "display": "standalone",
+  "background_color": "#F2F7F6",
+  "theme_color": "#F2F7F6",
+  "icons": [
+    { "src": "/isms/app/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/isms/app/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

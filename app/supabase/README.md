@@ -37,10 +37,11 @@ Before inviting the public, connect an email service under **Authentication → 
 
 ## 3. Allow the app to receive sign-ins
 
-Open **Authentication → URL Configuration** and, under **Redirect URLs**, add the address that email links and social sign-in return to:
+Open **Authentication → URL Configuration** and, under **Redirect URLs**, add the addresses that email links and social sign-in return to: one for the phone apps, one for the web version.
 
 ```
 isms://**
+https://vipbdiddy.github.io/isms/app/**
 ```
 
 ## 4. Google, Apple and Facebook sign-in (optional, one at a time)

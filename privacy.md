@@ -12,7 +12,7 @@ This policy explains what information Ism's collects, how it is used, and who ca
 - **Your name and friends.** The name you choose for other people to see (if you sign in with Google, it starts as your Google name), whether people may find you, and who you are friends with or have sent or received friend requests from.
 - **Your contacts, only if you ask.** If you choose "Find friends from your contacts", the app asks your phone for permission, reads the email addresses in your contacts, and turns each one into a scrambled code (a SHA-256 hash) on your phone. Only those codes are sent, to check which belong to people on Ism's; they are not stored. Your contacts' names, phone numbers and addresses are never read or uploaded. We only keep a count of how many times you checked each day, to stop misuse.
 - **Reports.** If you report something, we keep the report and the reason you picked so a reviewer can look at it.
-- **On your phone only.** Your display preferences, and a name you enter before signing in, stay on your device.
+- **On your device only.** Your display preferences, and a name you enter before signing in, stay on your phone (or in your browser, on the web version).
 
 ## Who can see it
 

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Platform, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { Button, ErrorNote, Field, styles } from '../components/ui';
 import {
@@ -59,8 +59,7 @@ export default function Account() {
 
   const done = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const cleanEmail = email.trim().toLowerCase();
-  // Social sign-in opens the phone's browser and returns to the app; the web version can't do that.
-  const providers = Platform.OS === 'web' ? [] : SOCIAL_PROVIDERS;
+  const providers = SOCIAL_PROVIDERS;
   const entering = mode === 'signIn' || mode === 'signUp';
   const waiting = mode === 'checkEmail' || mode === 'resetSent';
 

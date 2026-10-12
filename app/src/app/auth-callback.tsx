@@ -6,7 +6,7 @@ import { Button, ErrorNote, styles } from '../components/ui';
 import { colors } from '../lib/theme';
 import { useAuthLink } from '../lib/useAuthLink';
 
-/** Where confirmation emails and social sign-in send people back into the app (isms://auth-callback). */
+/** Where confirmation emails and social sign-in send people back into the app (isms://auth-callback, or .../app/auth-callback on the web). */
 export default function AuthCallback() {
   const status = useAuthLink();
 
