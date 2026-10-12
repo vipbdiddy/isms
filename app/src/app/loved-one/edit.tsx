@@ -195,7 +195,7 @@ function LookalikeCard({
 }
 
 const local = StyleSheet.create({
-  card: { ...cardStyle, padding: space.lg, gap: space.md, borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  card: { ...cardStyle, padding: space.lg, gap: space.md, borderColor: colors.accent, borderWidth: 2 },
   title: { fontSize: 17, fontWeight: '700', color: colors.ink },
   person: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
   name: { fontSize: 16, fontWeight: '600', color: colors.ink },
