@@ -8,6 +8,8 @@ Sign in with your Google account or an email address to start saving. Everything
 
 **[Download Ism's for Android](https://github.com/vipbdiddy/isms/releases/latest/download/isms.apk)**
 
+**On an iPhone, or any computer: [open Ism's in your browser](app/).** On an iPhone, tap the Share button in Safari, then **Add to Home Screen**, and it opens like an app.
+
 [Privacy policy](privacy.html) · [Terms of service](terms.html)
 
 Contact: [vipbdiddy@gmail.com](mailto:vipbdiddy@gmail.com)

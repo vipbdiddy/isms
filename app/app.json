@@ -25,7 +25,9 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "output": "single"
+      "output": "single",
+      "themeColor": "#F2F7F6",
+      "description": "Keep the sayings and stories of the people you've lost."
     },
     "plugins": [
       "expo-router",

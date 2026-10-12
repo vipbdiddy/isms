@@ -19,6 +19,9 @@ npm install
 npx expo start      # then scan the QR code with Expo Go, or press w for web
 npm test            # advice-matching and privacy rules
 npm run typecheck
+
+# The web version, as published at https://vipbdiddy.github.io/isms/app/
+ISMS_WEB_BASE_URL=/isms/app npx expo export --platform web
 ```
 
 ## How it's built
@@ -40,6 +43,8 @@ Expo (React Native) + Expo Router, TypeScript.
 | `src/lib/store.tsx` | App state, loaded from and saved to Supabase |
 | `src/lib/db.ts`, `src/lib/auth.ts` | Talking to Supabase: data, sign-in |
 | `supabase/` | Database setup script and dashboard steps ([setup guide](supabase/README.md)) |
+| `public/` | The web version's page, home-screen icons and manifest (paths assume `/isms/app/`) |
+| `app.config.js` | Sets the web version's address (`ISMS_WEB_BASE_URL`) only when building it |
 | `src/lib/seed.ts` | Example shared families so "Everyone" isn't empty |
 
 ## What's next

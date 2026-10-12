@@ -7,7 +7,7 @@ import { friendlyAuthError, setNewPassword } from '../lib/auth';
 import { colors } from '../lib/theme';
 import { useAuthLink } from '../lib/useAuthLink';
 
-/** Opened by the link in a password-reset email (isms://reset-password). */
+/** Opened by the link in a password-reset email (isms://reset-password, or .../app/reset-password on the web). */
 export default function ResetPassword() {
   const status = useAuthLink();
   const [password, setPassword] = useState('');
