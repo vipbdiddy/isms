@@ -107,7 +107,9 @@ export function VisibilityPicker({ value, onChange }: { value: Visibility; onCha
       <Segmented options={VISIBILITIES} value={value} onChange={onChange} />
       <Text style={styles.hint}>
         {VISIBILITY_HINTS[value]}
-        {value === 'private' ? '' : ' You can still keep single quotes or stories private.'}
+        {value === 'private'
+          ? ''
+          : ' You can still keep single quotes or stories private. Anything that might hurt someone is checked by Ism’s before others see it.'}
       </Text>
     </View>
   );
@@ -119,12 +121,15 @@ export function Button({
   variant = 'primary',
   icon,
   disabled,
+  small,
 }: {
   title: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
   icon?: IconName;
   disabled?: boolean;
+  /** A compact button that sits beside other things, like "Add friend" in a list. */
+  small?: boolean;
 }) {
   const textColor = variant === 'primary' ? '#fff' : variant === 'danger' ? colors.danger : colors.accent;
   return (
@@ -137,10 +142,11 @@ export function Button({
         styles.button,
         variant === 'secondary' && styles.buttonSecondary,
         variant === 'danger' && styles.buttonDanger,
+        small && styles.buttonSmall,
         (pressed || disabled) && { opacity: disabled ? 0.4 : 0.8 },
       ]}>
-      {icon ? <Ionicons name={icon} size={18} color={textColor} /> : null}
-      <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+      {icon ? <Ionicons name={icon} size={small ? 16 : 18} color={textColor} /> : null}
+      <Text style={[styles.buttonText, small && styles.buttonTextSmall, { color: textColor }]}>{title}</Text>
     </Pressable>
   );
 }
@@ -235,6 +241,8 @@ export const styles = StyleSheet.create({
   buttonSecondary: { backgroundColor: colors.accentSoft },
   buttonDanger: { backgroundColor: colors.dangerSoft },
   buttonText: { fontSize: 16, fontWeight: '600' },
+  buttonSmall: { paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
+  buttonTextSmall: { fontSize: 14 },
   textButton: { fontSize: 15, fontWeight: '600', paddingVertical: space.xs },
   field: { gap: 6 },
   label: { fontSize: 14, fontWeight: '600', color: colors.ink },

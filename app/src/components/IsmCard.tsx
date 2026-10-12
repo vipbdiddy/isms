@@ -3,12 +3,15 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { isShared } from '../lib/advice';
+import { COMMUNITY_OWNER } from '../lib/seed';
 import { useStore } from '../lib/store';
 import { cardStyle, colors, radius, space } from '../lib/theme';
 import { timeAgo } from '../lib/time';
 import { topicLabel } from '../lib/topics';
 import type { Ism } from '../lib/types';
 import { Avatar } from './Avatar';
+import { ReportPanel, ReviewNote } from './ReportPanel';
 
 /** Stories longer than this start collapsed. */
 const PREVIEW_CHARS = 280;
@@ -18,9 +21,13 @@ const PREVIEW_CHARS = 280;
  * `showAuthor` false hides whose it is, on that person's own page.
  */
 export function IsmCard({ ism, showAuthor = true, showTime = false }: { ism: Ism; showAuthor?: boolean; showTime?: boolean }) {
-  const { getLovedOne, savedIsmIds, toggleSaved, sharedBy } = useStore();
+  const { getLovedOne, savedIsmIds, toggleSaved, sharedBy, userId, report } = useStore();
   const [expanded, setExpanded] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reported, setReported] = useState(false);
   const lovedOne = getLovedOne(ism.lovedOneId);
+  const mine = ism.ownerId === userId;
+  const canReport = !!userId && !mine && ism.ownerId !== COMMUNITY_OWNER;
   const saved = savedIsmIds.has(ism.id);
   const story = ism.kind === 'story';
   const long = story && ism.text.length > PREVIEW_CHARS;
@@ -28,10 +35,22 @@ export function IsmCard({ ism, showAuthor = true, showTime = false }: { ism: Ism
   const when = showTime && byWhom !== 'An example' ? timeAgo(ism.createdAt) : undefined;
   const credit = [byWhom ?? (when ? 'Added by you' : undefined), when].filter(Boolean).join(' · ');
 
+  if (reported) {
+    return (
+      <View style={[styles.card, styles.reported]}>
+        <Ionicons name="checkmark-circle-outline" size={20} color={colors.sage} />
+        <Text style={styles.reportedText}>
+          Thanks for letting us know. It’s hidden for you now, and someone at Ism’s will take a look.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}
       onPress={() => router.push({ pathname: '/loved-one/[id]', params: { id: ism.lovedOneId } })}>
+      {mine && lovedOne && isShared(ism, lovedOne) ? <ReviewNote status={ism.reviewStatus} /> : null}
       {story ? (
         <>
           <Text style={styles.kind}>Story</Text>
@@ -63,6 +82,16 @@ export function IsmCard({ ism, showAuthor = true, showTime = false }: { ism: Ism
           {credit && (showAuthor || showTime) ? <Text style={styles.credit}>{credit}</Text> : null}
           {ism.topics.length > 0 ? <Text style={styles.topics}>{ism.topics.map(topicLabel).join(' · ')}</Text> : null}
         </View>
+        {canReport && !reporting ? (
+          <Pressable
+            onPress={() => setReporting(true)}
+            hitSlop={12}
+            style={styles.heart}
+            accessibilityRole="button"
+            accessibilityLabel="Report">
+            <Ionicons name="flag-outline" size={20} color={colors.muted} />
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={() => {
             if (!toggleSaved(ism.id)) router.push('/account');
@@ -74,6 +103,15 @@ export function IsmCard({ ism, showAuthor = true, showTime = false }: { ism: Ism
           <Ionicons name={saved ? 'heart' : 'heart-outline'} size={24} color={saved ? colors.accent : colors.muted} />
         </Pressable>
       </View>
+      {reporting ? (
+        <ReportPanel
+          onCancel={() => setReporting(false)}
+          onReport={async (reason) => {
+            await report({ ismId: ism.id }, reason);
+            setReported(true);
+          }}
+        />
+      ) : null}
     </Pressable>
   );
 }
@@ -103,4 +141,6 @@ const styles = StyleSheet.create({
   credit: { fontSize: 12, color: colors.accent, fontWeight: '500' },
   topics: { fontSize: 12, color: colors.muted },
   heart: { padding: 2 },
+  reported: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.sageSoft, borderColor: colors.sageSoft },
+  reportedText: { flex: 1, fontSize: 14, lineHeight: 20, color: colors.ink },
 });

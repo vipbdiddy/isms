@@ -38,6 +38,8 @@ export default function Home() {
     sharedBy,
     notice,
     dismissNotice,
+    isAdmin,
+    reviewCount,
     loadError,
     loading,
     refresh,
@@ -67,6 +69,14 @@ export default function Home() {
         </View>
       ) : null}
       {loadError ? <ErrorNote message={loadError} /> : null}
+      {isAdmin && reviewCount > 0 ? (
+        <View style={banner}>
+          <Text style={[styles.body, { flex: 1 }]}>
+            {reviewCount === 1 ? '1 shared memory is' : `${reviewCount} shared memories are`} waiting for your review.
+          </Text>
+          <TextButton title="Review" onPress={() => router.push('/review')} />
+        </View>
+      ) : null}
       <ScopeToggle
         value={scope}
         onChange={(next) => {

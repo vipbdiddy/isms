@@ -10,6 +10,20 @@ The app talks to the Supabase project in `src/lib/config.ts`. These steps are do
 
 Running it again later is safe, and is how updates to the rules (like friends) are applied.
 
+## 1b. Make yourself a reviewer
+
+Reviewers see the Review screen (Settings → Review shared memories), where shared memories that might be hurtful, and anything people report, wait to be allowed or removed. In **SQL Editor → New query**, run this with the email address you sign in with:
+
+```sql
+insert into public.admins (user_id)
+select id from auth.users where email = 'you@example.com'
+on conflict do nothing;
+
+select u.email from public.admins a join auth.users u on u.id = a.user_id;
+```
+
+The second part lists every reviewer, so you can check it worked.
+
 ## 2. Email: what works on the free plan
 
 Supabase's built-in email only reaches members of your Supabase organization, about 2 emails an hour, and new free projects can't edit its templates. The app works with the standard emails as they are: confirmation and password-reset emails contain a link that opens the app.

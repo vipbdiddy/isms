@@ -112,7 +112,8 @@ export default function EditIsm() {
             <Text style={styles.label}>Keep this one private</Text>
             <Text style={styles.hint}>
               {lovedOne.name} is shared with {lovedOne.visibility === 'friends' ? 'your friends' : 'everyone'}. Turn this on
-              to keep just this {noun} to yourself.
+              to keep just this {noun} to yourself. Shared memories that might hurt someone are checked by Ism’s before
+              others see them.
             </Text>
           </View>
           <Switch

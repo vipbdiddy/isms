@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 
 import type { Viewer } from './advice';
 import * as db from './db';
+import { contactEmailHashes } from './contacts';
 import { moveDeviceDataToAccount, readLegacy } from './migrate';
 import { deletePhoto, photoLinks, uploadPhoto, type PickedPhoto } from './photos';
 import { COMMUNITY_OWNER, SEED_ISMS, SEED_LOVED_ONES } from './seed';
@@ -16,7 +17,9 @@ import type {
   IsmInput,
   LovedOne,
   LovedOneInput,
+  PersonResult,
   Profile,
+  ReviewItem,
   Settings,
 } from './types';
 
@@ -28,6 +31,9 @@ const DEFAULT_SETTINGS: Settings = { displayName: '', defaultScope: 'friends' };
 
 /** Coming back to the app reloads when the last load is older than this. */
 const STALE_AFTER_MS = 60_000;
+
+/** How long a reported memory stays on screen (showing a thank-you) before it disappears. */
+const REPORTED_FADE_MS = 4000;
 
 const isExample = (id: string) => id.startsWith('seed-');
 
@@ -60,8 +66,12 @@ interface Store {
   /** Everything you may see (filter further with `visibleIsms`). */
   isms: Ism[];
   savedIsmIds: Set<string>;
-  /** The name friends see and your friend code. Null when signed out or not loaded yet. */
+  /** The name others see and whether they can find you. Null when signed out or not loaded yet. */
   profile: Profile | null;
+  /** Whether you review shared memories that are held or reported. */
+  isAdmin: boolean;
+  /** Reviewers only: how many shared memories are waiting for a look. */
+  reviewCount: number;
   /** Why friends couldn't be loaded, if they couldn't. */
   friendsError?: string;
   /** Your friends and open friend requests, newest first. */
@@ -88,12 +98,21 @@ interface Store {
   /** Returns false when the person has to sign in first. */
   toggleSaved: (ismId: string) => boolean;
   updateSettings: (patch: Partial<Settings>) => void;
-  /** Ask whoever has this friend code to be friends. */
-  addFriend: (code: string) => Promise<FriendRequestResult>;
+  /** People whose name contains `query`, who allow being found. */
+  searchPeople: (query: string) => Promise<PersonResult[]>;
+  /** Asks for permission, then finds which of your contacts use Ism's. Null when permission was refused. */
+  findFromContacts: () => Promise<PersonResult[] | null>;
+  sendFriendRequest: (userId: string) => Promise<FriendRequestResult>;
   answerFriendRequest: (otherId: string, accept: boolean) => Promise<void>;
   /** Unfriend someone, or take back a request you sent. */
   removeFriend: (otherId: string) => Promise<void>;
   setMyName: (name: string) => Promise<void>;
+  setDiscoverable: (discoverable: boolean) => Promise<void>;
+  /** Report someone else's quote, story or loved one; it disappears for you right away. */
+  report: (target: { ismId?: string; lovedOneId?: string }, reason: string) => Promise<void>;
+  /** Reviewers only. */
+  loadReviewItems: () => Promise<ReviewItem[]>;
+  review: (item: ReviewItem, allow: boolean) => Promise<void>;
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -113,6 +132,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [friendships, setFriendships] = useState<Friendship[]>([]);
   const [friendsError, setFriendsError] = useState<string>();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [reviewCount, setReviewCount] = useState(0);
   const userId = session?.user.id ?? '';
 
   // Settings, example hearts and the sign-in all come from the device first.
@@ -157,6 +178,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         : Promise.resolve(null);
       const [data, friends] = await Promise.all([db.fetchAll(userId || null), friendsLoad]);
       const withLinks = await withPhotos(data.lovedOnes);
+      const waiting = friends?.isAdmin
+        ? await db.contentToReview().then(
+            (items) => items.length,
+            () => 0,
+          )
+        : 0;
       if (load !== latestLoad.current) return;
       setLovedOnes(withLinks);
       setIsms(data.isms);
@@ -166,6 +193,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setProfile(friends.me);
         setProfiles(friends.others);
         setFriendships(friends.friendships);
+        setIsAdmin(friends.isAdmin);
+        setReviewCount(waiting);
         setFriendsError(friends.me ? undefined : 'Your friends list isn’t ready yet. Pull down to try again.');
       } else if (userId) {
         setFriendsError('Couldn’t load your friends. Check your connection and pull down to try again.');
@@ -205,6 +234,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setProfiles([]);
     setFriendships([]);
     setFriendsError(undefined);
+    setIsAdmin(false);
+    setReviewCount(0);
     (async () => {
       if (userId) {
         try {
@@ -253,6 +284,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       isms: [...isms, ...SEED_ISMS],
       savedIsmIds: new Set([...savedIds, ...savedExamples]),
       profile,
+      isAdmin,
+      reviewCount,
       friendsError,
       friendships,
       friendIds,
@@ -345,9 +378,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
       },
 
-      addFriend: async (code) => {
+      searchPeople: (query) => db.searchPeople(query),
+
+      findFromContacts: async () => {
         requireUser();
-        const result = await db.sendFriendRequest(code);
+        const hashes = await contactEmailHashes();
+        return hashes === null ? null : hashes.length ? db.findPeopleFromContacts(hashes) : [];
+      },
+
+      sendFriendRequest: async (otherId) => {
+        requireUser();
+        const result = await db.sendFriendRequestTo(otherId);
         // A new request or friendship changes what you can see.
         if (result.result === 'sent' || result.result === 'now_friends') await refresh();
         return result;
@@ -367,8 +408,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       setMyName: async (name) => {
         const id = requireUser();
-        await db.updateMyName(id, name);
+        await db.updateMyProfile(id, { displayName: name });
         setProfile((p) => (p ? { ...p, displayName: name } : p));
+      },
+
+      setDiscoverable: async (discoverable) => {
+        const id = requireUser();
+        await db.updateMyProfile(id, { discoverable });
+        setProfile((p) => (p ? { ...p, discoverable } : p));
+      },
+
+      report: async (target, reason) => {
+        requireUser();
+        await db.report(target, reason);
+        // Leave it a moment so the thank-you can be read, then hide it everywhere.
+        setTimeout(() => {
+          if (target.ismId) setIsms((list) => list.filter((i) => i.id !== target.ismId));
+          if (target.lovedOneId) {
+            setLovedOnes((list) => list.filter((l) => l.id !== target.lovedOneId));
+            setIsms((list) => list.filter((i) => i.lovedOneId !== target.lovedOneId));
+          }
+        }, REPORTED_FADE_MS);
+      },
+
+      loadReviewItems: async () => {
+        const items = await db.contentToReview();
+        setReviewCount(items.length);
+        return items;
+      },
+
+      review: async (item, allow) => {
+        await db.reviewContent(item.kind, item.id, allow);
+        setReviewCount((n) => Math.max(0, n - 1));
       },
     };
   }, [
@@ -384,6 +455,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     savedExamples,
     notice,
     profile,
+    isAdmin,
+    reviewCount,
     profiles,
     friendships,
     friendsError,

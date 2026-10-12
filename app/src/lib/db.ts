@@ -1,5 +1,17 @@
 import { supabase } from './supabase';
-import type { FriendRequestResult, Friendship, Ism, IsmInput, LovedOne, LovedOneInput, Profile, Visibility } from './types';
+import type {
+  FriendRequestResult,
+  Friendship,
+  Ism,
+  IsmInput,
+  LovedOne,
+  LovedOneInput,
+  PersonResult,
+  Profile,
+  ReviewItem,
+  ReviewStatus,
+  Visibility,
+} from './types';
 
 // Rows as they're stored in Supabase (see supabase/schema.sql).
 interface LovedOneRow {
@@ -12,6 +24,7 @@ interface LovedOneRow {
   obituary: string | null;
   photo_path: string | null;
   visibility: Visibility;
+  review_status: ReviewStatus;
   created_at: string;
 }
 
@@ -25,13 +38,37 @@ interface IsmRow {
   context: string | null;
   topics: string[];
   keep_private: boolean;
+  review_status: ReviewStatus;
   created_at: string;
 }
 
 interface ProfileRow {
   id: string;
   display_name: string;
-  friend_code: string;
+  discoverable: boolean;
+}
+
+interface PersonRow {
+  id: string;
+  display_name: string;
+  mutual_friends: number;
+  relationship: PersonResult['relationship'];
+}
+
+interface ReviewRow {
+  item_kind: ReviewItem['kind'];
+  item_id: string;
+  loved_one_id: string;
+  loved_one_name: string;
+  owner_name: string;
+  title: string | null;
+  body: string;
+  context: string | null;
+  visibility: Visibility;
+  review_status: ReviewStatus;
+  report_count: number;
+  reasons: string[];
+  created_at: string;
 }
 
 interface FriendshipRow {
@@ -53,6 +90,7 @@ const toLovedOne = (r: LovedOneRow): LovedOne => ({
   obituary: orUndefined(r.obituary),
   photoPath: orUndefined(r.photo_path),
   visibility: r.visibility,
+  reviewStatus: r.review_status,
   createdAt: Date.parse(r.created_at),
 });
 
@@ -66,7 +104,15 @@ const toIsm = (r: IsmRow): Ism => ({
   context: orUndefined(r.context),
   topics: r.topics,
   keepPrivate: r.keep_private,
+  reviewStatus: r.review_status,
   createdAt: Date.parse(r.created_at),
+});
+
+const toPerson = (r: PersonRow): PersonResult => ({
+  id: r.id,
+  displayName: r.display_name,
+  mutualFriends: r.mutual_friends,
+  relationship: r.relationship,
 });
 
 const lovedOneColumns = (input: Partial<LovedOneInput> & { photoPath?: string | null }) => {
@@ -152,20 +198,22 @@ export async function setSaved(ismId: string, saved: boolean) {
 }
 
 /**
- * Your own profile (with your friend code), the names of the people you're connected to,
- * and your friends and friend requests.
+ * Your own profile, the names of the people you're connected to, your friends and friend requests,
+ * and whether you review shared memories.
  */
 export async function fetchFriends(userId: string) {
-  const [profiles, friendships] = await Promise.all([
-    supabase.from('profiles').select('id, display_name, friend_code'),
+  const [profiles, friendships, admin] = await Promise.all([
+    supabase.from('profiles').select('id, display_name, discoverable'),
     supabase.from('friendships').select('requester, addressee, status, created_at').order('created_at', { ascending: false }),
+    supabase.rpc('is_admin'),
   ]);
   if (profiles.error) throw profiles.error;
   if (friendships.error) throw friendships.error;
   const rows = profiles.data as ProfileRow[];
   const mine = rows.find((r) => r.id === userId);
   return {
-    me: mine ? { id: mine.id, displayName: mine.display_name, friendCode: mine.friend_code } : null,
+    me: mine ? { id: mine.id, displayName: mine.display_name, discoverable: mine.discoverable } : null,
+    isAdmin: admin.data === true,
     others: rows.filter((r) => r.id !== userId).map((r): Profile => ({ id: r.id, displayName: r.display_name })),
     friendships: (friendships.data as FriendshipRow[]).map(
       (r): Friendship => ({
@@ -178,9 +226,22 @@ export async function fetchFriends(userId: string) {
   };
 }
 
-/** Ask whoever has this friend code to be friends. Spaces and dashes in the code don't matter. */
-export async function sendFriendRequest(code: string) {
-  const { data, error } = await supabase.rpc('send_friend_request', { code });
+/** People whose name contains `query` (at least 2 letters), if they allow being found. */
+export async function searchPeople(query: string) {
+  const { data, error } = await supabase.rpc('search_people', { query });
+  if (error) throw error;
+  return (data as PersonRow[]).map(toPerson);
+}
+
+/** People whose email address is one of these SHA-256 hashes, if they allow being found. */
+export async function findPeopleFromContacts(emailHashes: string[]) {
+  const { data, error } = await supabase.rpc('find_people_from_contacts', { email_hashes: emailHashes });
+  if (error) throw error;
+  return (data as PersonRow[]).map(toPerson);
+}
+
+export async function sendFriendRequestTo(userId: string) {
+  const { data, error } = await supabase.rpc('send_friend_request_to', { other_id: userId });
   if (error) throw error;
   return data as FriendRequestResult;
 }
@@ -196,12 +257,47 @@ export async function removeFriend(otherId: string) {
   if (error) throw error;
 }
 
-export async function updateMyName(userId: string, displayName: string) {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ display_name: displayName })
-    .eq('id', userId)
-    .select('id')
-    .single();
+export async function updateMyProfile(userId: string, changes: { displayName?: string; discoverable?: boolean }) {
+  const row: Partial<ProfileRow> = {};
+  if (changes.displayName !== undefined) row.display_name = changes.displayName;
+  if (changes.discoverable !== undefined) row.discoverable = changes.discoverable;
+  const { error } = await supabase.from('profiles').update(row).eq('id', userId).select('id').single();
+  if (error) throw error;
+}
+
+/** Report someone else's shared quote, story or loved one. It's hidden from you straight away. */
+export async function report(target: { ismId?: string; lovedOneId?: string }, reason: string) {
+  const { error } = await supabase.rpc('report_content', {
+    target_ism: target.ismId ?? null,
+    target_loved_one: target.lovedOneId ?? null,
+    why: reason,
+  });
+  if (error) throw error;
+}
+
+/** Reviewers only: shared memories held for their words or reported, oldest first. */
+export async function contentToReview(): Promise<ReviewItem[]> {
+  const { data, error } = await supabase.rpc('content_to_review');
+  if (error) throw error;
+  return (data as ReviewRow[]).map((r) => ({
+    kind: r.item_kind,
+    id: r.item_id,
+    lovedOneId: r.loved_one_id,
+    lovedOneName: r.loved_one_name,
+    ownerName: r.owner_name,
+    title: orUndefined(r.title),
+    body: r.body,
+    context: orUndefined(r.context),
+    visibility: r.visibility,
+    reviewStatus: r.review_status,
+    reportCount: r.report_count,
+    reasons: r.reasons,
+    createdAt: Date.parse(r.created_at),
+  }));
+}
+
+/** Reviewers only: allow something (everyone it's shared with sees it) or remove it (only its owner does). */
+export async function reviewContent(kind: ReviewItem['kind'], id: string, allow: boolean) {
+  const { error } = await supabase.rpc('review_content', { item_kind: kind, item_id: id, allow });
   if (error) throw error;
 }
