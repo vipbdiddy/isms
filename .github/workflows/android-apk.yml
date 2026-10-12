@@ -39,9 +39,11 @@ jobs:
         env:
           CI: 1
 
+      # Only the two kinds of processors real Android phones use. Leaving out the emulator
+      # kinds (x86, x86_64) roughly halves the download.
       - name: Build the APK
         working-directory: app/android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
 
       - run: cp android/app/build/outputs/apk/release/app-release.apk isms.apk
 
