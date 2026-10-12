@@ -1,19 +1,33 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 
+import type { Viewer } from './advice';
 import * as db from './db';
 import { moveDeviceDataToAccount, readLegacy } from './migrate';
 import { deletePhoto, photoLinks, uploadPhoto, type PickedPhoto } from './photos';
-import { SEED_ISMS, SEED_LOVED_ONES } from './seed';
+import { COMMUNITY_OWNER, SEED_ISMS, SEED_LOVED_ONES } from './seed';
 import { supabase } from './supabase';
-import type { Ism, IsmInput, LovedOne, LovedOneInput, Settings } from './types';
+import type {
+  FriendRequestResult,
+  Friendship,
+  Ism,
+  IsmInput,
+  LovedOne,
+  LovedOneInput,
+  Profile,
+  Settings,
+} from './types';
 
 const SETTINGS_KEY = 'isms/settings';
 /** Hearts on the example families, which live in the app rather than the database. */
 const SAVED_EXAMPLES_KEY = 'isms/saved-examples';
 
-const DEFAULT_SETTINGS: Settings = { displayName: '', defaultScope: 'mine' };
+const DEFAULT_SETTINGS: Settings = { displayName: '', defaultScope: 'friends' };
+
+/** Coming back to the app reloads when the last load is older than this. */
+const STALE_AFTER_MS = 60_000;
 
 const isExample = (id: string) => id.startsWith('seed-');
 
@@ -41,11 +55,24 @@ interface Store {
   /** The signed-in person's id, or '' when signed out. */
   userId: string;
   settings: Settings;
-  /** Your own loved ones plus every public one from other families. */
+  /** Your own loved ones, your friends' shared ones, and every public one from other families. */
   lovedOnes: LovedOne[];
   /** Everything you may see (filter further with `visibleIsms`). */
   isms: Ism[];
   savedIsmIds: Set<string>;
+  /** The name friends see and your friend code. Null when signed out or not loaded yet. */
+  profile: Profile | null;
+  /** Why friends couldn't be loaded, if they couldn't. */
+  friendsError?: string;
+  /** Your friends and open friend requests, newest first. */
+  friendships: Friendship[];
+  friendIds: Set<string>;
+  /** Who is looking, for the visibility rules in advice.ts. */
+  viewer: Viewer;
+  /** The name of someone you're connected to, or '' when it isn't known. */
+  nameOf: (userId: string) => string;
+  /** "Shared by Ann", "Shared by their family" or "An example"; undefined for your own. */
+  sharedBy: (ownerId: string) => string | undefined;
   /** Shown once after moving memories saved on this phone into the account. */
   notice?: string;
   dismissNotice: () => void;
@@ -61,6 +88,12 @@ interface Store {
   /** Returns false when the person has to sign in first. */
   toggleSaved: (ismId: string) => boolean;
   updateSettings: (patch: Partial<Settings>) => void;
+  /** Ask whoever has this friend code to be friends. */
+  addFriend: (code: string) => Promise<FriendRequestResult>;
+  answerFriendRequest: (otherId: string, accept: boolean) => Promise<void>;
+  /** Unfriend someone, or take back a request you sent. */
+  removeFriend: (otherId: string) => Promise<void>;
+  setMyName: (name: string) => Promise<void>;
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -76,6 +109,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string>();
   const [notice, setNotice] = useState<string>();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [friendships, setFriendships] = useState<Friendship[]>([]);
+  const [friendsError, setFriendsError] = useState<string>();
   const userId = session?.user.id ?? '';
 
   // Settings, example hearts and the sign-in all come from the device first.
@@ -106,17 +143,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Only the newest load may update the screen, so a slow one from before a sign-out can't win.
   const latestLoad = useRef(0);
+  const lastLoadedAt = useRef(0);
   const refresh = useCallback(async () => {
     const load = ++latestLoad.current;
     setLoading(true);
     try {
-      const data = await db.fetchAll(userId || null);
+      // Friends load separately, so trouble there never hides your own memories.
+      const friendsLoad = userId
+        ? db.fetchFriends(userId).catch((e: unknown) => {
+            console.warn('Could not load friends', e);
+            return null;
+          })
+        : Promise.resolve(null);
+      const [data, friends] = await Promise.all([db.fetchAll(userId || null), friendsLoad]);
       const withLinks = await withPhotos(data.lovedOnes);
       if (load !== latestLoad.current) return;
       setLovedOnes(withLinks);
       setIsms(data.isms);
       setSavedIds(data.savedIsmIds);
       setLoadError(undefined);
+      if (friends) {
+        setProfile(friends.me);
+        setProfiles(friends.others);
+        setFriendships(friends.friendships);
+        setFriendsError(friends.me ? undefined : 'Your friends list isn’t ready yet. Pull down to try again.');
+      } else if (userId) {
+        setFriendsError('Couldn’t load your friends. Check your connection and pull down to try again.');
+      }
+      lastLoadedAt.current = Date.now();
     } catch (e) {
       if (load !== latestLoad.current) return;
       console.warn('Could not load', e);
@@ -126,6 +180,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [userId, withPhotos]);
 
+  // Coming back to the app after a while picks up what friends shared in the meantime.
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && lastLoadedAt.current > 0 && Date.now() - lastLoadedAt.current > STALE_AFTER_MS) {
+        refreshRef.current();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
   // Reload whenever someone signs in or out; on sign-in, bring over anything saved on this phone first.
   useEffect(() => {
     if (!ready) return;
@@ -133,6 +201,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLovedOnes([]);
     setIsms([]);
     setSavedIds([]);
+    setProfile(null);
+    setProfiles([]);
+    setFriendships([]);
+    setFriendsError(undefined);
     (async () => {
       if (userId) {
         try {
@@ -153,9 +225,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return userId;
   }, [userId]);
 
+  const friendIds = useMemo(
+    () => new Set(friendships.filter((f) => f.status === 'accepted').map((f) => f.otherId)),
+    [friendships],
+  );
+  const viewer = useMemo<Viewer>(() => ({ userId, friendIds }), [userId, friendIds]);
+
   const store = useMemo<Store>(() => {
     const allLovedOnes = [...lovedOnes, ...SEED_LOVED_ONES];
     const byId = new Map(allLovedOnes.map((l) => [l.id, l]));
+    const names = new Map(profiles.map((p) => [p.id, p.displayName.trim()]));
+    if (profile) names.set(profile.id, profile.displayName.trim());
+    const nameOf = (id: string) => names.get(id) ?? '';
     const replaceLovedOne = async (updated: LovedOne) => {
       const [withPhoto] = await withPhotos([updated]);
       setLovedOnes((list) => list.map((l) => (l.id === updated.id ? withPhoto : l)));
@@ -171,6 +252,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       lovedOnes: allLovedOnes,
       isms: [...isms, ...SEED_ISMS],
       savedIsmIds: new Set([...savedIds, ...savedExamples]),
+      profile,
+      friendsError,
+      friendships,
+      friendIds,
+      viewer,
+      nameOf,
+      sharedBy: (ownerId) => {
+        if (ownerId === userId) return undefined;
+        if (ownerId === COMMUNITY_OWNER) return 'An example';
+        if (friendIds.has(ownerId)) return `Shared by ${nameOf(ownerId) || 'a friend'}`;
+        return 'Shared by their family';
+      },
       notice,
       dismissNotice: () => setNotice(undefined),
       refresh,
@@ -251,8 +344,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return next;
         });
       },
+
+      addFriend: async (code) => {
+        requireUser();
+        const result = await db.sendFriendRequest(code);
+        // A new request or friendship changes what you can see.
+        if (result.result === 'sent' || result.result === 'now_friends') await refresh();
+        return result;
+      },
+
+      answerFriendRequest: async (otherId, accept) => {
+        requireUser();
+        await db.answerFriendRequest(otherId, accept);
+        await refresh();
+      },
+
+      removeFriend: async (otherId) => {
+        requireUser();
+        await db.removeFriend(otherId);
+        await refresh();
+      },
+
+      setMyName: async (name) => {
+        const id = requireUser();
+        await db.updateMyName(id, name);
+        setProfile((p) => (p ? { ...p, displayName: name } : p));
+      },
     };
-  }, [ready, loading, loadError, session, userId, settings, lovedOnes, isms, savedIds, savedExamples, notice, refresh, requireUser, withPhotos]);
+  }, [
+    ready,
+    loading,
+    loadError,
+    session,
+    userId,
+    settings,
+    lovedOnes,
+    isms,
+    savedIds,
+    savedExamples,
+    notice,
+    profile,
+    profiles,
+    friendships,
+    friendsError,
+    friendIds,
+    viewer,
+    refresh,
+    requireUser,
+    withPhotos,
+  ]);
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;
 }

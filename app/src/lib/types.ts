@@ -1,7 +1,8 @@
-export type Visibility = 'private' | 'public';
+/** Who can see a loved one's memories: only you, your friends too, or everyone. */
+export type Visibility = 'private' | 'friends' | 'public';
 
-/** Whose words to draw from: only your own loved ones, or every public family too. */
-export type Scope = 'mine' | 'everyone';
+/** Whose words to draw from: only your own loved ones, your friends' too, or everything shared with you. */
+export type Scope = 'mine' | 'friends' | 'everyone';
 
 export interface LovedOne {
   id: string;
@@ -16,7 +17,7 @@ export interface LovedOne {
   /** A link the app can show the photo from (fetched for photoPath, or bundled for examples). */
   photoUri?: string;
   obituary?: string;
-  /** Public loved ones (and their isms) are visible to every user of the app. */
+  /** Public loved ones (and their isms) are visible to every user of the app; friends-only ones to the owner's friends. */
   visibility: Visibility;
   createdAt: number;
 }
@@ -39,7 +40,7 @@ export interface Ism {
   /** Quotes only: when or why they'd say it. */
   context?: string;
   topics: string[];
-  /** Keeps a single ism private even when the loved one is shared publicly. */
+  /** Keeps a single ism private even when the loved one is shared. */
   keepPrivate?: boolean;
   createdAt: number;
 }
@@ -53,3 +54,25 @@ export interface Settings {
   displayName: string;
   defaultScope: Scope;
 }
+
+/** The name other people see. Your own profile also carries the code friends use to add you. */
+export interface Profile {
+  id: string;
+  displayName: string;
+  friendCode?: string;
+}
+
+/** A friend, or a request to be friends that hasn't been answered yet. */
+export interface Friendship {
+  /** The other person. */
+  otherId: string;
+  status: 'pending' | 'accepted';
+  /** True when they asked you; false when you asked them. */
+  incoming: boolean;
+  createdAt: number;
+}
+
+/** What happened when you asked someone to be friends, using their friend code. */
+export type FriendRequestResult =
+  | { result: 'not_found' | 'self' | 'need_name' }
+  | { result: 'sent' | 'already_sent' | 'already_friends' | 'now_friends'; name: string };

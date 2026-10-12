@@ -2,16 +2,17 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text } from 'react-native';
 
-import { Button, DangerButton, ErrorNote, Field, ScopeToggle, styles } from '../../components/ui';
-import { deleteAccount, signOut } from '../../lib/auth';
-import { useStore } from '../../lib/store';
+import { NameField } from '../components/NameField';
+import { Button, DangerButton, ErrorNote, ScopeToggle, styles } from '../components/ui';
+import { deleteAccount, signOut } from '../lib/auth';
+import { useStore } from '../lib/store';
 
 export default function SettingsScreen() {
   const { settings, updateSettings, session, userId } = useStore();
   const [error, setError] = useState<string>();
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.subheading}>Account</Text>
       {session ? (
         <>
@@ -29,24 +30,20 @@ export default function SettingsScreen() {
         </>
       )}
 
-      <Field
-        label="Your first name"
-        placeholder="So we can say hi"
-        value={settings.displayName}
-        onChangeText={(displayName) => updateSettings({ displayName })}
-      />
+      <Text style={styles.subheading}>About you</Text>
+      <NameField />
 
-      <Text style={styles.subheading}>Whose advice to show by default</Text>
+      <Text style={styles.subheading}>Whose memories to show at first</Text>
       <ScopeToggle value={settings.defaultScope} onChange={(defaultScope) => updateSettings({ defaultScope })} />
       <Text style={styles.muted}>
-        "My loved ones" shows only the people you've added. "Everyone" also includes quotes and stories other families
-        have chosen to share. You can always flip it on any screen.
+        “Mine” shows only the people you’ve added. “Friends” adds what your friends share with you. “Everyone” also
+        includes what other families share with everyone. You can always switch on any screen.
       </Text>
 
       <Text style={styles.subheading}>Privacy</Text>
       <Text style={styles.muted}>
-        Everything you add is private unless you mark a loved one as shared. When shared, their profile, quotes and
-        stories can be read by others, but you can still keep individual quotes or stories private.
+        Everything you add is private until you share a loved one with your friends or with everyone. Even then, you
+        can keep single quotes or stories private. Friends see your name, never your email address.
       </Text>
 
       {error ? <ErrorNote message={error} /> : null}
@@ -56,7 +53,7 @@ export default function SettingsScreen() {
           <Text style={styles.subheading}>Delete account</Text>
           <DangerButton
             title="Delete my account"
-            message="This permanently deletes your account and every loved one, photo, quote and story you added. It can't be undone."
+            message="This permanently deletes your account, your friend list, and every loved one, photo, quote and story you added. It can't be undone."
             confirmTitle="Delete forever"
             onConfirm={() =>
               deleteAccount(userId).catch((e) => {

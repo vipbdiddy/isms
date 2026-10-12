@@ -1,16 +1,16 @@
 # Ism's Terms of Service
 
-Last updated: October 11, 2026
+Last updated: October 12, 2026
 
 By using Ism's, you agree to these terms.
 
 ## Your content
 
-You own the ism's, stories, photos and notes you save. You give Ism's permission to store them and show them to you so the app can work. If you choose to share a loved one, you also give Ism's permission to show what you shared to other people using Ism's, until you stop sharing it. Please only save and share content you have the right to share.
+You own the ism's, stories, photos and notes you save. You give Ism's permission to store them and show them to you so the app can work. If you choose to share a loved one with your friends or with everyone, you also give Ism's permission to show what you shared to those people, until you stop sharing it. Please only save and share content you have the right to share.
 
 ## Acceptable use
 
-Do not use Ism's to break the law, harass anyone, or try to get into other people's accounts.
+Do not use Ism's to break the law, harass anyone (including through friend requests), or try to get into other people's accounts.
 
 ## No warranty
 
@@ -18,7 +18,7 @@ Ism's is provided as is. We do our best to keep your ism's safe, but we cannot p
 
 ## Ending use
 
-You can stop using Ism's at any time, and you can delete your account and everything you saved in the app under Settings → Delete my account. We may suspend accounts that break these terms.
+You can stop using Ism's at any time, and you can delete your account and everything you saved in the app under Settings (⚙) → Delete my account. We may suspend accounts that break these terms.
 
 ## Changes
 

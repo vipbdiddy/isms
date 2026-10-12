@@ -1,24 +1,58 @@
 import { TOPICS } from './topics.ts';
 import type { Ism, KindFilter, LovedOne, Scope } from './types.ts';
 
-/** Whether a user may see an ism: always their own, otherwise only if the family shared it. */
-export function canSee(ism: Ism, lovedOne: LovedOne | undefined, userId: string): boolean {
-  if (ism.ownerId === userId) return true;
-  return lovedOne?.visibility === 'public' && !ism.keepPrivate;
+/** Who is looking: their id ('' when signed out) and the ids of their friends. */
+export interface Viewer {
+  userId: string;
+  friendIds: ReadonlySet<string>;
 }
 
-export function visibleIsms(
-  isms: Ism[],
-  lovedOnes: LovedOne[],
-  userId: string,
-  scope: Scope,
-): Ism[] {
+/**
+ * Whether someone may see a loved one: always their own; otherwise only if the family shared them
+ * with everyone, or with their friends and the viewer is one. Mirrors the rules in supabase/schema.sql.
+ */
+export function canSeeLovedOne(lovedOne: LovedOne, viewer: Viewer): boolean {
+  if (lovedOne.ownerId === viewer.userId) return true;
+  if (lovedOne.visibility === 'public') return true;
+  return lovedOne.visibility === 'friends' && viewer.friendIds.has(lovedOne.ownerId);
+}
+
+/** Whether someone may see an ism: always their own; otherwise only if its loved one is shared with them. */
+export function canSee(ism: Ism, lovedOne: LovedOne | undefined, viewer: Viewer): boolean {
+  if (ism.ownerId === viewer.userId) return true;
+  return !!lovedOne && !ism.keepPrivate && canSeeLovedOne(lovedOne, viewer);
+}
+
+/** Whether something added by `ownerId` belongs in a scope. Each scope includes the one before it. */
+export function inScope(ownerId: string, viewer: Viewer, scope: Scope): boolean {
+  if (scope === 'everyone' || ownerId === viewer.userId) return true;
+  return scope === 'friends' && viewer.friendIds.has(ownerId);
+}
+
+export function visibleIsms(isms: Ism[], lovedOnes: LovedOne[], viewer: Viewer, scope: Scope): Ism[] {
   const byId = new Map(lovedOnes.map((l) => [l.id, l]));
   return isms.filter(
-    (ism) =>
-      canSee(ism, byId.get(ism.lovedOneId), userId) &&
-      (scope === 'everyone' || ism.ownerId === userId),
+    (ism) => canSee(ism, byId.get(ism.lovedOneId), viewer) && inScope(ism.ownerId, viewer, scope),
   );
+}
+
+/** One entry in the home feed: a new quote or story, or a newly added loved one. */
+export type FeedItem =
+  | { type: 'ism'; id: string; at: number; ism: Ism }
+  | { type: 'lovedOne'; id: string; at: number; lovedOne: LovedOne };
+
+/** Everything in a scope that the viewer may see, newest first. */
+export function feed(isms: Ism[], lovedOnes: LovedOne[], viewer: Viewer, scope: Scope): FeedItem[] {
+  const people: FeedItem[] = lovedOnes
+    .filter((l) => canSeeLovedOne(l, viewer) && inScope(l.ownerId, viewer, scope))
+    .map((l) => ({ type: 'lovedOne', id: `loved-one-${l.id}`, at: l.createdAt, lovedOne: l }));
+  const memories: FeedItem[] = visibleIsms(isms, lovedOnes, viewer, scope).map((ism) => ({
+    type: 'ism',
+    id: `ism-${ism.id}`,
+    at: ism.createdAt,
+    ism,
+  }));
+  return [...memories, ...people].sort((a, b) => b.at - a.at);
 }
 
 export function matchesKind(ism: Ism, filter: KindFilter): boolean {

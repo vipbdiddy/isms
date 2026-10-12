@@ -5,9 +5,10 @@ The app talks to the Supabase project in `src/lib/config.ts`. These steps are do
 ## 1. Create the tables and privacy rules
 
 1. Open **SQL Editor → New query**.
-2. Paste the whole of [`schema.sql`](schema.sql) and press **Run**. It should say "Success. No rows returned".
+2. Paste the whole of [`schema.sql`](schema.sql) and press **Run**.
+3. Supabase warns that the query "includes destructive operations". That's expected: it replaces the privacy rules with the current ones and doesn't delete anyone's data. Click **Run this query**. It should say "Success. No rows returned".
 
-Running it again later is safe.
+Running it again later is safe, and is how updates to the rules (like friends) are applied.
 
 ## 2. Email: what works on the free plan
 

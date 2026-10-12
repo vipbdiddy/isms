@@ -106,13 +106,21 @@ export default function EditIsm() {
       />
       {suggested.length > 0 && <Text style={styles.hint}>We guessed these from the words — tap to change.</Text>}
 
-      {lovedOne.visibility === 'public' && (
+      {lovedOne.visibility !== 'private' && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Keep this one private</Text>
-            <Text style={styles.hint}>{lovedOne.name} is shared publicly. Turn this on to keep just this {noun} to yourself.</Text>
+            <Text style={styles.hint}>
+              {lovedOne.name} is shared with {lovedOne.visibility === 'friends' ? 'your friends' : 'everyone'}. Turn this on
+              to keep just this {noun} to yourself.
+            </Text>
           </View>
-          <Switch value={keepPrivate} onValueChange={setKeepPrivate} trackColor={{ true: colors.sage }} />
+          <Switch
+            value={keepPrivate}
+            onValueChange={setKeepPrivate}
+            trackColor={{ true: colors.accent, false: colors.border }}
+            thumbColor={colors.card}
+          />
         </View>
       )}
 

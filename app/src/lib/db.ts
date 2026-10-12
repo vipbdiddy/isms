@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Ism, IsmInput, LovedOne, LovedOneInput } from './types';
+import type { FriendRequestResult, Friendship, Ism, IsmInput, LovedOne, LovedOneInput, Profile, Visibility } from './types';
 
 // Rows as they're stored in Supabase (see supabase/schema.sql).
 interface LovedOneRow {
@@ -11,7 +11,7 @@ interface LovedOneRow {
   about: string | null;
   obituary: string | null;
   photo_path: string | null;
-  visibility: 'private' | 'public';
+  visibility: Visibility;
   created_at: string;
 }
 
@@ -25,6 +25,19 @@ interface IsmRow {
   context: string | null;
   topics: string[];
   keep_private: boolean;
+  created_at: string;
+}
+
+interface ProfileRow {
+  id: string;
+  display_name: string;
+  friend_code: string;
+}
+
+interface FriendshipRow {
+  requester: string;
+  addressee: string;
+  status: 'pending' | 'accepted';
   created_at: string;
 }
 
@@ -135,5 +148,60 @@ export async function setSaved(ismId: string, saved: boolean) {
   const { error } = saved
     ? await supabase.from('saved_isms').insert({ ism_id: ismId })
     : await supabase.from('saved_isms').delete().eq('ism_id', ismId);
+  if (error) throw error;
+}
+
+/**
+ * Your own profile (with your friend code), the names of the people you're connected to,
+ * and your friends and friend requests.
+ */
+export async function fetchFriends(userId: string) {
+  const [profiles, friendships] = await Promise.all([
+    supabase.from('profiles').select('id, display_name, friend_code'),
+    supabase.from('friendships').select('requester, addressee, status, created_at').order('created_at', { ascending: false }),
+  ]);
+  if (profiles.error) throw profiles.error;
+  if (friendships.error) throw friendships.error;
+  const rows = profiles.data as ProfileRow[];
+  const mine = rows.find((r) => r.id === userId);
+  return {
+    me: mine ? { id: mine.id, displayName: mine.display_name, friendCode: mine.friend_code } : null,
+    others: rows.filter((r) => r.id !== userId).map((r): Profile => ({ id: r.id, displayName: r.display_name })),
+    friendships: (friendships.data as FriendshipRow[]).map(
+      (r): Friendship => ({
+        otherId: r.requester === userId ? r.addressee : r.requester,
+        status: r.status,
+        incoming: r.addressee === userId,
+        createdAt: Date.parse(r.created_at),
+      }),
+    ),
+  };
+}
+
+/** Ask whoever has this friend code to be friends. Spaces and dashes in the code don't matter. */
+export async function sendFriendRequest(code: string) {
+  const { data, error } = await supabase.rpc('send_friend_request', { code });
+  if (error) throw error;
+  return data as FriendRequestResult;
+}
+
+export async function answerFriendRequest(requesterId: string, accept: boolean) {
+  const { error } = await supabase.rpc('respond_to_friend_request', { requester_id: requesterId, accept });
+  if (error) throw error;
+}
+
+/** Unfriend someone, or take back a request you sent them. */
+export async function removeFriend(otherId: string) {
+  const { error } = await supabase.rpc('remove_friend', { other_id: otherId });
+  if (error) throw error;
+}
+
+export async function updateMyName(userId: string, displayName: string) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ display_name: displayName })
+    .eq('id', userId)
+    .select('id')
+    .single();
   if (error) throw error;
 }

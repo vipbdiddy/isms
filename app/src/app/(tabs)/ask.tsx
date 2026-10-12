@@ -10,7 +10,7 @@ import type { KindFilter } from '../../lib/types';
 import { useScope } from '../../lib/useScope';
 
 export default function Ask() {
-  const { isms, lovedOnes, userId } = useStore();
+  const { isms, lovedOnes, userId, viewer } = useStore();
   const [scope, setScope] = useScope();
   const [situation, setSituation] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
@@ -22,10 +22,10 @@ export default function Ask() {
       findAdvice(
         situation,
         picked,
-        visibleIsms(isms, lovedOnes, userId, scope).filter((i) => matchesKind(i, kind)),
+        visibleIsms(isms, lovedOnes, viewer, scope).filter((i) => matchesKind(i, kind)),
         userId,
       ).slice(0, 25),
-    [situation, picked, isms, lovedOnes, userId, scope, kind],
+    [situation, picked, isms, lovedOnes, userId, viewer, scope, kind],
   );
   const asked = situation.trim().length > 0 || picked.length > 0;
 
@@ -50,7 +50,13 @@ export default function Ask() {
       <KindToggle value={kind} onChange={setKind} />
 
       {asked && matches.length === 0 && (
-        <Empty title={scope === 'mine' ? "Nothing from your loved ones fits yet. Try 'Everyone', or add more of their quotes and stories." : 'Nothing fits yet. Try different words or another situation.'} />
+        <Empty
+          title={
+            scope === 'everyone'
+              ? 'Nothing fits yet. Try different words or another situation.'
+              : `Nothing from ${scope === 'mine' ? 'your loved ones' : 'you and your friends'} fits yet. Try “Everyone”, or add more of their quotes and stories.`
+          }
+        />
       )}
       {matches.map(({ ism }) => (
         <IsmCard key={ism.id} ism={ism} />
