@@ -3,8 +3,9 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '../../components/Avatar';
-import { SHARED_WITH } from '../../components/LovedOneRow';
-import { Button, DangerButton, ErrorNote, Field, TextButton, VisibilityPicker, styles } from '../../components/ui';
+import { sharedWithLabel } from '../../components/LovedOneRow';
+import { SharingPicker } from '../../components/SharingPicker';
+import { Button, DangerButton, ErrorNote, Field, TextButton, styles } from '../../components/ui';
 import { canSeeLovedOne } from '../../lib/advice';
 import { findPossibleDuplicates } from '../../lib/duplicates';
 import { pickPhoto, type PickedPhoto } from '../../lib/photos';
@@ -14,7 +15,8 @@ import { cardStyle, colors, space } from '../../lib/theme';
 import type { LovedOne, Visibility } from '../../lib/types';
 
 export default function EditLovedOne() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // `groupId`: adding someone from a group's page shares them with that group to start with.
+  const { id, groupId: forGroup } = useLocalSearchParams<{ id?: string; groupId?: string }>();
   const { getLovedOne, addLovedOne, updateLovedOne, deleteLovedOne, userId, lovedOnes, viewer } = useStore();
   const existing = id ? getLovedOne(id) : undefined;
   const editable = !existing || existing.ownerId === userId;
@@ -26,7 +28,8 @@ export default function EditLovedOne() {
   const [obituary, setObituary] = useState(existing?.obituary ?? '');
   // undefined: keep the current photo; null: remove it; a PickedPhoto: replace it.
   const [photo, setPhoto] = useState<PickedPhoto | null>();
-  const [visibility, setVisibility] = useState<Visibility>(existing?.visibility ?? 'private');
+  const [visibility, setVisibility] = useState<Visibility>(existing?.visibility ?? (forGroup ? 'group' : 'private'));
+  const [groupId, setGroupId] = useState<string | undefined>(existing?.groupId ?? forGroup);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
   // People they've said "No, this is someone else" to.
@@ -67,6 +70,7 @@ export default function EditLovedOne() {
       about: about.trim() || undefined,
       obituary: obituary.trim() || undefined,
       visibility,
+      groupId: visibility === 'group' ? groupId : undefined,
     };
     setSaving(true);
     setError(undefined);
@@ -121,7 +125,14 @@ export default function EditLovedOne() {
         style={{ minHeight: 160 }}
       />
 
-      <VisibilityPicker value={visibility} onChange={setVisibility} />
+      <SharingPicker
+        visibility={visibility}
+        groupId={groupId}
+        onChange={(nextVisibility, nextGroup) => {
+          setVisibility(nextVisibility);
+          setGroupId(nextGroup);
+        }}
+      />
 
       {lookalikes.length > 0 && (
         <LookalikeCard
@@ -133,7 +144,11 @@ export default function EditLovedOne() {
       )}
 
       {error ? <ErrorNote message={error} /> : null}
-      <Button title={saving ? 'Saving…' : existing ? 'Save' : 'Add'} onPress={save} disabled={!name.trim() || saving} />
+      <Button
+        title={saving ? 'Saving…' : existing ? 'Save' : 'Add'}
+        onPress={save}
+        disabled={!name.trim() || saving || (visibility === 'group' && !groupId)}
+      />
       {existing && (
         <DangerButton
           title="Remove"
@@ -182,7 +197,7 @@ function LookalikeCard({
                 <Text style={styles.muted}>{[person.relationship, person.years].filter(Boolean).join(' · ')}</Text>
               ) : null}
               <Text style={local.whose}>
-                {mine ? `You already added them · ${SHARED_WITH[person.visibility]}` : sharedBy(person.ownerId)}
+                {mine ? `You already added them · ${sharedWithLabel(person)}` : sharedBy(person.ownerId)}
               </Text>
               <TextButton title={mine ? 'Yes, open their page' : 'Yes, see their memories'} onPress={() => onOpen(person.id)} />
             </View>

@@ -8,7 +8,7 @@ The app talks to the Supabase project in `src/lib/config.ts`. These steps are do
 2. Paste the whole of [`schema.sql`](schema.sql) and press **Run**.
 3. Supabase warns that the query "includes destructive operations". That's expected: it replaces the privacy rules with the current ones and doesn't delete anyone's data. Click **Run this query**. It should say "Success. No rows returned".
 
-Running it again later is safe, and is how updates to the rules (like friends) are applied.
+Running it again later is safe, and is how updates to the rules (like friends, groups and comments) are applied.
 
 ## 1b. Make yourself a reviewer
 

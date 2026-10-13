@@ -1,29 +1,50 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '../../components/Avatar';
 import { IsmCard } from '../../components/IsmCard';
+import { LikeButton, LikedBy } from '../../components/Reactions';
 import { ReportPanel, ReviewNote } from '../../components/ReportPanel';
+import { SharedBy, openGroup } from '../../components/SharedBy';
 import { Button, Empty, KindToggle, TextButton, styles } from '../../components/ui';
 import { canSee, canSeeLovedOne, isShared, matchesKind } from '../../lib/advice';
 import { COMMUNITY_OWNER } from '../../lib/seed';
 import { useStore } from '../../lib/store';
 import { cardStyle, colors, space } from '../../lib/theme';
-import type { KindFilter, Visibility } from '../../lib/types';
+import type { Group, KindFilter, Visibility } from '../../lib/types';
 
-const OWN_STATUS: Record<Visibility, string> = {
-  private: 'Private. Only you can see their quotes and stories.',
-  friends: 'Shared with your friends. They can see their quotes and stories.',
-  public: 'Shared with everyone. Anyone using Ism’s can see their quotes and stories.',
-};
+/** Who can see your own loved one, said on their page. */
+function ownStatus(visibility: Visibility, group: Group | undefined) {
+  switch (visibility) {
+    case 'private':
+      return 'Private. Only you can see their quotes and stories.';
+    case 'friends':
+      return 'Shared with your friends. They can see their quotes and stories.';
+    case 'group':
+      return group ? (
+        <>
+          {'Shared with '}
+          <Text style={{ fontWeight: '700', color: colors.accent }} onPress={() => openGroup(group.id)}>
+            {group.name}
+          </Text>
+          . Everyone in the group can see their quotes and stories.
+        </>
+      ) : (
+        'Shared with a group.'
+      );
+    case 'public':
+      return 'Shared with everyone. Anyone using Ism’s can see their quotes and stories.';
+  }
+}
 
 /** Obituaries longer than this start collapsed. */
 const OBITUARY_PREVIEW_LINES = 5;
 
 export default function LovedOneScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getLovedOne, isms, userId, viewer, sharedBy, report } = useStore();
+  const { getLovedOne, getGroup, isms, userId, viewer, report, commentsOn } = useStore();
   const [kind, setKind] = useState<KindFilter>('all');
   const [obituaryOpen, setObituaryOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -43,7 +64,11 @@ export default function LovedOneScreen() {
   }
 
   const mine = lovedOne.ownerId === userId;
-  const canReport = !!userId && !mine && lovedOne.ownerId !== COMMUNITY_OWNER;
+  const example = lovedOne.ownerId === COMMUNITY_OWNER;
+  const canReport = !!userId && !mine && !example;
+  const target = { lovedOneId: lovedOne.id };
+  const comments = commentsOn(target).length;
+  const group = lovedOne.groupId ? getGroup(lovedOne.groupId) : undefined;
   const theirs = isms.filter((i) => i.lovedOneId === id && canSee(i, lovedOne, viewer));
   const shown = theirs.filter((i) => matchesKind(i, kind));
   const add = (k: 'quote' | 'story') =>
@@ -70,11 +95,35 @@ export default function LovedOneScreen() {
         <Text style={local.name}>{lovedOne.name}</Text>
         <Text style={styles.muted}>{[lovedOne.relationship, lovedOne.years].filter(Boolean).join(' · ')}</Text>
         {lovedOne.about ? <Text style={[styles.body, { textAlign: 'center' }]}>{lovedOne.about}</Text> : null}
-        <Text style={[styles.muted, { textAlign: 'center' }]}>
-          {mine ? OWN_STATUS[lovedOne.visibility] : `${sharedBy(lovedOne.ownerId)}.`}
-        </Text>
+        {mine ? (
+          <Text style={[styles.muted, { textAlign: 'center' }]}>{ownStatus(lovedOne.visibility, group)}</Text>
+        ) : example ? (
+          <Text style={[styles.muted, { textAlign: 'center' }]}>An example.</Text>
+        ) : (
+          <SharedBy lovedOne={lovedOne} after="." style={{ ...styles.muted, textAlign: 'center' }} />
+        )}
         {canReport && !reporting ? <TextButton title="Report" color={colors.muted} onPress={() => setReporting(true)} /> : null}
       </View>
+      {example ? null : (
+        <View style={{ gap: space.xs }}>
+          <View style={local.reactions}>
+            <LikeButton target={target} />
+            <Pressable
+              onPress={() => router.push({ pathname: '/loved-one/comments', params: { id: lovedOne.id } })}
+              hitSlop={8}
+              style={local.commentLink}
+              accessibilityRole="button">
+              <Ionicons name="chatbubble-outline" size={20} color={colors.accent} />
+              <Text style={local.commentText}>
+                {comments ? `${comments} ${comments === 1 ? 'comment' : 'comments'}` : 'Leave a kind word'}
+              </Text>
+            </Pressable>
+          </View>
+          <View style={{ alignItems: 'center' }}>
+            <LikedBy target={target} />
+          </View>
+        </View>
+      )}
       {mine && isShared(undefined, lovedOne) ? <ReviewNote status={lovedOne.reviewStatus} /> : null}
       {reporting ? (
         <ReportPanel
@@ -145,4 +194,7 @@ const local = StyleSheet.create({
   obituary: { ...cardStyle, padding: space.lg, gap: space.sm },
   obituaryText: { fontSize: 16, lineHeight: 25, color: colors.ink },
   more: { fontSize: 14, fontWeight: '600', color: colors.accent },
+  reactions: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: space.xl },
+  commentLink: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  commentText: { fontSize: 15, fontWeight: '600', color: colors.accent },
 });

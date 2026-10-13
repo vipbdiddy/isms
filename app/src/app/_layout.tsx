@@ -30,7 +30,11 @@ function Root() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="loved-one/[id]" options={{ title: '' }} />
       <Stack.Screen name="loved-one/edit" options={{ presentation: 'modal', title: 'Loved one' }} />
+      <Stack.Screen name="loved-one/comments" options={{ title: 'Comments' }} />
       <Stack.Screen name="ism/edit" options={{ presentation: 'modal', title: 'Add a memory' }} />
+      <Stack.Screen name="ism/[id]" options={{ title: '' }} />
+      <Stack.Screen name="person/[id]" options={{ title: '' }} />
+      <Stack.Screen name="group/[id]" options={{ title: '' }} />
       <Stack.Screen name="account" options={{ presentation: 'modal', title: 'Account' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="review" options={{ title: 'Review shared memories' }} />

@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInpu
 
 import { cardStyle, colors, radius, space } from '../lib/theme';
 import { TOPICS } from '../lib/topics';
-import type { KindFilter, Scope, Visibility } from '../lib/types';
+import type { KindFilter, Scope } from '../lib/types';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -85,34 +85,6 @@ const KINDS = [
 
 export function KindToggle({ value, onChange }: { value: KindFilter; onChange: (k: KindFilter) => void }) {
   return <Segmented options={KINDS} value={value} onChange={onChange} />;
-}
-
-const VISIBILITIES = [
-  ['private', 'Just me'],
-  ['friends', 'Friends'],
-  ['public', 'Everyone'],
-] as const;
-
-const VISIBILITY_HINTS: Record<Visibility, string> = {
-  private: 'Only you can see them and their memories.',
-  friends: 'You and your friends on Ism’s can see them and their memories.',
-  public: 'Anyone using Ism’s can see them and their memories, even people who aren’t signed in.',
-};
-
-/** Who can see a loved one, with a line explaining the choice. */
-export function VisibilityPicker({ value, onChange }: { value: Visibility; onChange: (v: Visibility) => void }) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>Who can see their memories?</Text>
-      <Segmented options={VISIBILITIES} value={value} onChange={onChange} />
-      <Text style={styles.hint}>
-        {VISIBILITY_HINTS[value]}
-        {value === 'private'
-          ? ''
-          : ' You can still keep single quotes or stories private. Anything that might hurt someone is checked by Ism’s before others see it.'}
-      </Text>
-    </View>
-  );
 }
 
 export function Button({

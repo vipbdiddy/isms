@@ -16,7 +16,7 @@ const KINDS = [
 export default function EditIsm() {
   const params = useLocalSearchParams<{ lovedOneId: string; id?: string; kind?: EntryKind }>();
   const { lovedOneId, id } = params;
-  const { getLovedOne, isms, addIsm, updateIsm, deleteIsm, userId } = useStore();
+  const { getLovedOne, getGroup, isms, addIsm, updateIsm, deleteIsm, userId } = useStore();
   const lovedOne = getLovedOne(lovedOneId);
   const existing = id ? isms.find((i) => i.id === id) : undefined;
 
@@ -35,6 +35,12 @@ export default function EditIsm() {
   const story = kind === 'story';
   const suggested = topics.length === 0 ? detectTopics(`${story ? title : context} ${text}`) : [];
   const noun = story ? 'story' : 'quote';
+  const sharedWith =
+    lovedOne.visibility === 'friends'
+      ? 'your friends'
+      : lovedOne.visibility === 'group'
+        ? (getGroup(lovedOne.groupId ?? '')?.name ?? 'a group')
+        : 'everyone';
 
   const save = async () => {
     const fields = {
@@ -111,7 +117,7 @@ export default function EditIsm() {
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Keep this one private</Text>
             <Text style={styles.hint}>
-              {lovedOne.name} is shared with {lovedOne.visibility === 'friends' ? 'your friends' : 'everyone'}. Turn this on
+              {lovedOne.name} is shared with {sharedWith}. Turn this on
               to keep just this {noun} to yourself. Shared memories that might hurt someone are checked by Ism’s before
               others see them.
             </Text>

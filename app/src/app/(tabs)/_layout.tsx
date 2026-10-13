@@ -26,9 +26,10 @@ function SettingsButton() {
 }
 
 export default function TabsLayout() {
-  const { friendships } = useStore();
+  const { friendships, groupInvites } = useStore();
   const insets = useSafeAreaInsets();
-  const requests = friendships.filter((f) => f.status === 'pending' && f.incoming).length;
+  // Friend requests and group invitations waiting for an answer.
+  const requests = friendships.filter((f) => f.status === 'pending' && f.incoming).length + groupInvites.length;
 
   return (
     <Tabs

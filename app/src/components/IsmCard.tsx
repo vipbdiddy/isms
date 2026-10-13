@@ -11,29 +11,45 @@ import { timeAgo } from '../lib/time';
 import { topicLabel } from '../lib/topics';
 import type { Ism } from '../lib/types';
 import { Avatar } from './Avatar';
+import { CommentButton, LikeButton } from './Reactions';
 import { ReportPanel, ReviewNote } from './ReportPanel';
+import { SharedBy } from './SharedBy';
 
 /** Stories longer than this start collapsed. */
 const PREVIEW_CHARS = 280;
 
+/** Opens a quote or story on its own, with its comments. */
+export const openIsm = (id: string) => router.push({ pathname: '/ism/[id]', params: { id } });
+
 /**
- * A quote or story. `showTime` adds when it was shared, for the feed;
- * `showAuthor` false hides whose it is, on that person's own page.
+ * A quote or story. `showTime` adds when it was shared, for the feed; `showAuthor` false hides whose it
+ * is, on that person's own page. `inPost` is for its own page: the whole story, and no comment button
+ * (the comments are right below).
  */
-export function IsmCard({ ism, showAuthor = true, showTime = false }: { ism: Ism; showAuthor?: boolean; showTime?: boolean }) {
-  const { getLovedOne, savedIsmIds, toggleSaved, sharedBy, userId, report } = useStore();
-  const [expanded, setExpanded] = useState(false);
+export function IsmCard({
+  ism,
+  showAuthor = true,
+  showTime = false,
+  inPost = false,
+}: {
+  ism: Ism;
+  showAuthor?: boolean;
+  showTime?: boolean;
+  inPost?: boolean;
+}) {
+  const { getLovedOne, savedIsmIds, toggleSaved, userId, report } = useStore();
+  const [expanded, setExpanded] = useState(inPost);
   const [reporting, setReporting] = useState(false);
   const [reported, setReported] = useState(false);
   const lovedOne = getLovedOne(ism.lovedOneId);
   const mine = ism.ownerId === userId;
-  const canReport = !!userId && !mine && ism.ownerId !== COMMUNITY_OWNER;
+  const example = ism.ownerId === COMMUNITY_OWNER;
+  const canReport = !!userId && !mine && !example;
   const saved = savedIsmIds.has(ism.id);
   const story = ism.kind === 'story';
-  const long = story && ism.text.length > PREVIEW_CHARS;
-  const byWhom = sharedBy(ism.ownerId);
-  const when = showTime && byWhom !== 'An example' ? timeAgo(ism.createdAt) : undefined;
-  const credit = [byWhom ?? (when ? 'Added by you' : undefined), when].filter(Boolean).join(' · ');
+  const long = story && ism.text.length > PREVIEW_CHARS && !inPost;
+  const when = showTime && !example ? ` · ${timeAgo(ism.createdAt)}` : undefined;
+  const target = { ismId: ism.id };
 
   if (reported) {
     return (
@@ -79,28 +95,44 @@ export function IsmCard({ ism, showAuthor = true, showTime = false }: { ism: Ism
               {lovedOne.name}
             </Text>
           ) : null}
-          {credit && (showAuthor || showTime) ? <Text style={styles.credit}>{credit}</Text> : null}
+          {lovedOne && (showAuthor || showTime) ? (
+            example ? (
+              <Text style={styles.credit}>An example</Text>
+            ) : (
+              <SharedBy lovedOne={lovedOne} own={when ? 'Added by you' : undefined} after={when} style={styles.credit} />
+            )
+          ) : null}
           {ism.topics.length > 0 ? <Text style={styles.topics}>{ism.topics.map(topicLabel).join(' · ')}</Text> : null}
         </View>
+      </View>
+      <View style={styles.actions}>
+        {example ? null : (
+          <>
+            <LikeButton target={target} />
+            {inPost ? null : <CommentButton target={target} onPress={() => openIsm(ism.id)} />}
+          </>
+        )}
+        <View style={{ flex: 1 }} />
         {canReport && !reporting ? (
           <Pressable
             onPress={() => setReporting(true)}
-            hitSlop={12}
-            style={styles.heart}
+            hitSlop={10}
+            style={styles.icon}
             accessibilityRole="button"
             accessibilityLabel="Report">
-            <Ionicons name="flag-outline" size={20} color={colors.muted} />
+            <Ionicons name="flag-outline" size={19} color={colors.muted} />
           </Pressable>
         ) : null}
         <Pressable
           onPress={() => {
             if (!toggleSaved(ism.id)) router.push('/account');
           }}
-          hitSlop={12}
-          style={styles.heart}
+          hitSlop={10}
+          style={styles.icon}
           accessibilityRole="button"
+          accessibilityState={{ selected: saved }}
           accessibilityLabel={saved ? 'Remove from saved' : 'Save'}>
-          <Ionicons name={saved ? 'heart' : 'heart-outline'} size={24} color={saved ? colors.accent : colors.muted} />
+          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={21} color={saved ? colors.accent : colors.muted} />
         </Pressable>
       </View>
       {reporting ? (
@@ -140,7 +172,16 @@ const styles = StyleSheet.create({
   author: { fontSize: 14, fontWeight: '600', color: colors.ink },
   credit: { fontSize: 12, color: colors.accent, fontWeight: '500' },
   topics: { fontSize: 12, color: colors.muted },
-  heart: { padding: 2 },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: space.sm,
+    marginTop: space.xs,
+  },
+  icon: { padding: 4 },
   reported: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.sageSoft, borderColor: colors.sageSoft },
   reportedText: { flex: 1, fontSize: 14, lineHeight: 20, color: colors.ink },
 });

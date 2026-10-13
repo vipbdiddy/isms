@@ -9,18 +9,26 @@ import { contactEmailHashes } from './contacts';
 import { moveDeviceDataToAccount, readLegacy } from './migrate';
 import { deletePhoto, photoLinks, uploadPhoto, type PickedPhoto } from './photos';
 import { COMMUNITY_OWNER, SEED_ISMS, SEED_LOVED_ONES } from './seed';
+import { byTarget, knowsSharer, targetKey, type Circle } from './social';
 import { supabase } from './supabase';
 import type {
+  Comment,
+  CreateGroupResult,
   FriendRequestResult,
   Friendship,
+  Group,
+  GroupInviteResult,
+  GroupMember,
   Ism,
   IsmInput,
+  Like,
   LovedOne,
   LovedOneInput,
   PersonResult,
   Profile,
   ReviewItem,
   Settings,
+  Target,
 } from './types';
 
 const SETTINGS_KEY = 'isms/settings';
@@ -79,10 +87,45 @@ interface Store {
   friendIds: Set<string>;
   /** Who is looking, for the visibility rules in advice.ts. */
   viewer: Viewer;
-  /** The name of someone you're connected to, or '' when it isn't known. */
+  /** The name of someone you may see, or '' when it isn't known. */
   nameOf: (userId: string) => string;
+  /**
+   * Whether you may open someone's profile and see their name on what they share: yourself, your friends,
+   * the people in your groups, and anyone with a public profile.
+   */
+  knows: (userId: string) => boolean;
   /** "Shared by Ann", "Shared by their family" or "An example"; undefined for your own. */
   sharedBy: (ownerId: string) => string | undefined;
+  /** Groups you're in, by name. */
+  groups: Group[];
+  /** Invitations to join a group, waiting for your answer. */
+  groupInvites: { group: Group; invitedBy?: string; createdAt: number }[];
+  /** A group you're in or are invited to. */
+  getGroup: (id: string) => Group | undefined;
+  /** Who's in a group you're in, and who's invited, oldest first. */
+  membersOf: (groupId: string) => GroupMember[];
+  createGroup: (name: string) => Promise<CreateGroupResult>;
+  renameGroup: (groupId: string, name: string) => Promise<void>;
+  /** Owners only. Loved ones shared with it become private again. */
+  deleteGroup: (groupId: string) => Promise<void>;
+  inviteToGroup: (groupId: string, userId: string) => Promise<GroupInviteResult>;
+  answerGroupInvite: (groupId: string, accept: boolean) => Promise<void>;
+  /** Your loved ones shared with the group become private again. */
+  leaveGroup: (groupId: string) => Promise<void>;
+  /** The owner removes someone or takes back an invitation; whoever invited someone can take it back. */
+  removeFromGroup: (groupId: string, userId: string) => Promise<void>;
+  /** Who liked a quote, story or loved one, newest first. */
+  likesOn: (target: Target) => Like[];
+  likedByMe: (target: Target) => boolean;
+  /** Returns false when the person has to sign in first. */
+  toggleLike: (target: Target) => boolean;
+  /** Comments on a quote, story or loved one, oldest first. */
+  commentsOn: (target: Target) => Comment[];
+  addComment: (target: Target, body: string) => Promise<Comment>;
+  /** Your own comment, or anyone's on something you shared. */
+  deleteComment: (comment: Comment) => Promise<void>;
+  /** Report someone else's comment; it disappears for you right away. */
+  reportComment: (comment: Comment, reason: string) => Promise<void>;
   /** Shown once after moving memories saved on this phone into the account. */
   notice?: string;
   dismissNotice: () => void;
@@ -108,6 +151,7 @@ interface Store {
   removeFriend: (otherId: string) => Promise<void>;
   setMyName: (name: string) => Promise<void>;
   setDiscoverable: (discoverable: boolean) => Promise<void>;
+  setPublicProfile: (publicProfile: boolean) => Promise<void>;
   /** Report someone else's quote, story or loved one; it disappears for you right away. */
   report: (target: { ismId?: string; lovedOneId?: string }, reason: string) => Promise<void>;
   /** Reviewers only. */
@@ -134,6 +178,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [friendsError, setFriendsError] = useState<string>();
   const [isAdmin, setIsAdmin] = useState(false);
   const [reviewCount, setReviewCount] = useState(0);
+  const [groupList, setGroupList] = useState<Group[]>([]);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [likes, setLikes] = useState<Like[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  // Names of people found by search or in contacts, who may not be among `profiles`.
+  const [foundNames, setFoundNames] = useState<ReadonlyMap<string, string>>(new Map());
   const userId = session?.user.id ?? '';
 
   // Settings, example hearts and the sign-in all come from the device first.
@@ -182,7 +232,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           })
         : Promise.resolve(null);
       const [data, friends] = await Promise.all([db.fetchAll(userId || null), friendsLoad]);
-      const withLinks = await withPhotos(data.lovedOnes);
+      // The names of everyone on screen: who shared what you can see, who liked or commented on it,
+      // your friends and requests, and the people in your groups. The database leaves out anyone
+      // whose name you may not see.
+      const people = new Set<string>([
+        ...data.lovedOnes.map((l) => l.ownerId),
+        ...data.likes.map((l) => l.userId),
+        ...data.comments.map((c) => c.authorId),
+        ...(friends?.friendships.map((f) => f.otherId) ?? []),
+        ...(friends?.groupMembers.flatMap((m) => (m.invitedBy ? [m.userId, m.invitedBy] : [m.userId])) ?? []),
+      ]);
+      people.delete(userId);
+      const namesLoad = userId
+        ? db.fetchNames([...people]).catch((e: unknown) => {
+            console.warn('Could not load names', e);
+            return [];
+          })
+        : Promise.resolve([]);
+      const [withLinks, others] = await Promise.all([withPhotos(data.lovedOnes), namesLoad]);
       const waiting = friends?.isAdmin
         ? await db.contentToReview().then(
             (items) => items.length,
@@ -197,11 +264,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setLovedOnes(withLinks);
       setIsms(data.isms);
       setSavedIds(data.savedIsmIds);
+      setLikes(data.likes);
+      setComments(data.comments);
       setLoadError(undefined);
+      setProfiles(others);
       if (friends) {
         setProfile(friends.me);
-        setProfiles(friends.others);
         setFriendships(friends.friendships);
+        setGroupList(friends.groups);
+        setGroupMembers(friends.groupMembers);
         setIsAdmin(friends.isAdmin);
         setReviewCount(waiting);
         setFriendsError(friends.me ? undefined : 'Your friends list isn’t ready yet. Pull down to try again.');
@@ -241,6 +312,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setProfiles([]);
     setFriendships([]);
+    setGroupList([]);
+    setGroupMembers([]);
+    setLikes([]);
+    setComments([]);
+    setFoundNames(new Map());
     setFriendsError(undefined);
     setIsAdmin(false);
     setReviewCount(0);
@@ -268,16 +344,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     () => new Set(friendships.filter((f) => f.status === 'accepted').map((f) => f.otherId)),
     [friendships],
   );
-  const viewer = useMemo<Viewer>(() => ({ userId, friendIds }), [userId, friendIds]);
+  // The groups you're in, and everyone in them.
+  const groupIds = useMemo(
+    () => new Set(groupMembers.filter((m) => m.userId === userId && m.status === 'member').map((m) => m.groupId)),
+    [groupMembers, userId],
+  );
+  const groupmateIds = useMemo(
+    () =>
+      new Set(
+        groupMembers
+          .filter((m) => m.status === 'member' && m.userId !== userId && groupIds.has(m.groupId))
+          .map((m) => m.userId),
+      ),
+    [groupMembers, groupIds, userId],
+  );
+  const viewer = useMemo<Viewer>(() => ({ userId, friendIds, groupIds }), [userId, friendIds, groupIds]);
+  const circle = useMemo<Circle>(
+    () => ({
+      userId,
+      friendIds,
+      groupmateIds,
+      publicProfileIds: new Set(profiles.filter((p) => p.publicProfile).map((p) => p.id)),
+    }),
+    [userId, friendIds, groupmateIds, profiles],
+  );
+  const likesByTarget = useMemo(() => byTarget(likes), [likes]);
+  const commentsByTarget = useMemo(() => byTarget(comments), [comments]);
 
   const store = useMemo<Store>(() => {
     const allLovedOnes = [...lovedOnes, ...SEED_LOVED_ONES];
     const byId = new Map(allLovedOnes.map((l) => [l.id, l]));
     const names = new Map(profiles.map((p) => [p.id, p.displayName.trim()]));
     if (profile) names.set(profile.id, profile.displayName.trim());
-    const nameOf = (id: string) => names.get(id) ?? '';
+    const nameOf = (id: string) => names.get(id) ?? foundNames.get(id) ?? '';
+    const remember = (found: PersonResult[]) => {
+      if (found.length) setFoundNames((known) => new Map([...known, ...found.map((p): [string, string] => [p.id, p.displayName])]));
+      return found;
+    };
+    const knows = (id: string) => knowsSharer(id, circle);
+    const groupsById = new Map(groupList.map((g) => [g.id, g]));
     const changedHere = () => {
       localChanges.current += 1;
+    };
+    /** Runs a change to groups, then reloads: groups decide what you can see. */
+    const thenReload = async <T,>(change: () => Promise<T>) => {
+      requireUser();
+      const result = await change();
+      await refresh();
+      return result;
     };
     const replaceLovedOne = async (updated: LovedOne) => {
       const [withPhoto] = await withPhotos([updated]);
@@ -303,11 +417,62 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       friendIds,
       viewer,
       nameOf,
+      knows,
       sharedBy: (ownerId) => {
         if (ownerId === userId) return undefined;
         if (ownerId === COMMUNITY_OWNER) return 'An example';
-        if (friendIds.has(ownerId)) return `Shared by ${nameOf(ownerId) || 'a friend'}`;
+        if (knows(ownerId)) return `Shared by ${nameOf(ownerId) || (friendIds.has(ownerId) ? 'a friend' : 'someone you know')}`;
         return 'Shared by their family';
+      },
+      groups: groupList.filter((g) => groupIds.has(g.id)),
+      groupInvites: groupMembers
+        .filter((m) => m.userId === userId && m.status === 'invited' && groupsById.has(m.groupId))
+        .map((m) => ({ group: groupsById.get(m.groupId)!, invitedBy: m.invitedBy, createdAt: m.createdAt })),
+      getGroup: (id) => groupsById.get(id),
+      membersOf: (groupId) => groupMembers.filter((m) => m.groupId === groupId),
+      createGroup: (name) => thenReload(() => db.createGroup(name)),
+      renameGroup: (groupId, name) => thenReload(() => db.renameGroup(groupId, name)),
+      deleteGroup: (groupId) => thenReload(() => db.deleteGroup(groupId)),
+      inviteToGroup: (groupId, otherId) => thenReload(() => db.inviteToGroup(groupId, otherId)),
+      answerGroupInvite: (groupId, accept) => thenReload(() => db.answerGroupInvite(groupId, accept)),
+      leaveGroup: (groupId) => thenReload(() => db.leaveGroup(groupId)),
+      removeFromGroup: (groupId, otherId) => thenReload(() => db.removeFromGroup(groupId, otherId)),
+
+      likesOn: (target) => likesByTarget.get(targetKey(target)) ?? [],
+      likedByMe: (target) => !!userId && (likesByTarget.get(targetKey(target)) ?? []).some((l) => l.userId === userId),
+      toggleLike: (target) => {
+        if (!userId) return false;
+        const key = targetKey(target);
+        const liking = !(likesByTarget.get(key) ?? []).some((l) => l.userId === userId);
+        const mine = (l: Like) => l.userId === userId && targetKey(l) === key;
+        changedHere();
+        setLikes((list) => (liking ? [{ userId, ...target }, ...list] : list.filter((l) => !mine(l))));
+        db.setLiked(target, liking).catch((e) => {
+          console.warn('Could not save like', e);
+          setLikes((list) => (liking ? list.filter((l) => !mine(l)) : [{ userId, ...target }, ...list]));
+        });
+        return true;
+      },
+      commentsOn: (target) => commentsByTarget.get(targetKey(target)) ?? [],
+      addComment: async (target, body) => {
+        requireUser();
+        const created = await db.insertComment(target, body);
+        changedHere();
+        setComments((list) => [...list, created]);
+        return created;
+      },
+      deleteComment: async (comment) => {
+        requireUser();
+        await db.removeComment(comment.id);
+        changedHere();
+        setComments((list) => list.filter((c) => c.id !== comment.id));
+      },
+      reportComment: async (comment, reason) => {
+        requireUser();
+        await db.reportComment(comment.id, reason);
+        changedHere();
+        // Like report(): the thank-you shows for a moment, then the comment is gone.
+        setTimeout(() => setComments((list) => list.filter((c) => c.id !== comment.id)), REPORTED_FADE_MS);
       },
       notice,
       dismissNotice: () => setNotice(undefined),
@@ -396,12 +561,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
       },
 
-      searchPeople: (query) => db.searchPeople(query),
+      searchPeople: (query) => db.searchPeople(query).then(remember),
 
       findFromContacts: async () => {
         requireUser();
         const hashes = await contactEmailHashes();
-        return hashes === null ? null : hashes.length ? db.findPeopleFromContacts(hashes) : [];
+        return hashes === null ? null : hashes.length ? db.findPeopleFromContacts(hashes).then(remember) : [];
       },
 
       sendFriendRequest: async (otherId) => {
@@ -434,6 +599,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const id = requireUser();
         await db.updateMyProfile(id, { discoverable });
         setProfile((p) => (p ? { ...p, discoverable } : p));
+      },
+
+      setPublicProfile: async (publicProfile) => {
+        const id = requireUser();
+        await db.updateMyProfile(id, { publicProfile });
+        setProfile((p) => (p ? { ...p, publicProfile } : p));
       },
 
       report: async (target, reason) => {
@@ -477,10 +648,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     isAdmin,
     reviewCount,
     profiles,
+    foundNames,
     friendships,
     friendsError,
     friendIds,
     viewer,
+    circle,
+    groupList,
+    groupMembers,
+    groupIds,
+    likesByTarget,
+    commentsByTarget,
     refresh,
     requireUser,
     withPhotos,
