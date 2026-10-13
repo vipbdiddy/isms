@@ -33,7 +33,8 @@ export function LovedOneRow({ lovedOne, count, at }: { lovedOne: LovedOne; count
   const { userId, getGroup } = useStore();
   const mine = lovedOne.ownerId === userId;
   const example = lovedOne.ownerId === COMMUNITY_OWNER;
-  const memories = count === undefined ? undefined : `${count} ${count === 1 ? 'memory' : 'memories'}`;
+  // A no-break space keeps "3 memories" on one line.
+  const memories = count === undefined ? undefined : `${count}\u00a0${count === 1 ? 'memory' : 'memories'}`;
   const when = at !== undefined && !example ? timeAgo(at) : undefined;
   const group = lovedOne.groupId ? getGroup(lovedOne.groupId) : undefined;
 

@@ -129,11 +129,13 @@ export function CommentComposer({ target }: { target: Target }) {
     if (!body || sending) return;
     setSending(true);
     setError(undefined);
+    // Empty the box straight away, so anything typed while this one posts isn't wiped when it's done.
+    setText('');
     try {
       await addComment(target, body);
-      setText('');
     } catch (e) {
       console.warn('Could not comment', e);
+      setText((typed) => typed || body);
       const message = e instanceof Error ? e.message : '';
       setError(
         /a lot of comments/.test(message)
@@ -168,6 +170,7 @@ export function CommentComposer({ target }: { target: Target }) {
           <Ionicons name="send" size={18} color="#fff" />
         </Pressable>
       </View>
+      {sending ? <Text style={ui.hint}>Posting…</Text> : null}
       {error ? <ErrorNote message={error} /> : null}
       {text.length > MAX_COMMENT - 100 ? <Text style={ui.hint}>{MAX_COMMENT - text.length} characters left</Text> : null}
     </View>

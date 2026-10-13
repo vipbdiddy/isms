@@ -31,6 +31,7 @@ export default function Home() {
     userId,
     profile,
     friendIds,
+    groups,
     settings,
     savedIsmIds,
     notice,
@@ -108,7 +109,7 @@ export default function Home() {
         </Card>
       )}
 
-      {userId && scope !== 'mine' && friendIds.size === 0 ? (
+      {userId && scope !== 'mine' && friendIds.size === 0 && groups.length === 0 ? (
         <Card style={{ backgroundColor: colors.sageSoft, borderColor: colors.sageSoft }}>
           <Text style={[styles.body, { fontWeight: '600' }]}>Share memories with friends</Text>
           <Text style={styles.body}>

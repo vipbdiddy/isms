@@ -447,7 +447,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         requireUser();
         await db.reportComment(comment.id, reason);
         changedHere();
-        setComments((list) => list.filter((c) => c.id !== comment.id));
+        // Like report(): the thank-you shows for a moment, then the comment is gone.
+        setTimeout(() => setComments((list) => list.filter((c) => c.id !== comment.id)), REPORTED_FADE_MS);
       },
       notice,
       dismissNotice: () => setNotice(undefined),
