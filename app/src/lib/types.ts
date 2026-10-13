@@ -1,5 +1,5 @@
-/** Who can see a loved one's memories: only you, your friends too, or everyone. */
-export type Visibility = 'private' | 'friends' | 'public';
+/** Who can see a loved one's memories: only you, your friends too, one of your groups, or everyone. */
+export type Visibility = 'private' | 'friends' | 'group' | 'public';
 
 /** Whose words to draw from: only your own loved ones, your friends' too, or everything shared with you. */
 export type Scope = 'mine' | 'friends' | 'everyone';
@@ -23,8 +23,13 @@ export interface LovedOne {
   /** A link the app can show the photo from (fetched for photoPath, or bundled for examples). */
   photoUri?: string;
   obituary?: string;
-  /** Public loved ones (and their isms) are visible to every user of the app; friends-only ones to the owner's friends. */
+  /**
+   * Public loved ones (and their isms) are visible to every user of the app; friends-only ones to the owner's
+   * friends; group ones to the members of `groupId`.
+   */
   visibility: Visibility;
+  /** The group they're shared with, when `visibility` is 'group'. */
+  groupId?: string;
   /** Missing for the bundled examples, which are always fine. */
   reviewStatus?: ReviewStatus;
   createdAt: number;
@@ -70,6 +75,8 @@ export interface Profile {
   displayName: string;
   /** Your own profile only: whether others can find you by name or in their contacts. */
   discoverable?: boolean;
+  /** Whether anyone may open their profile, not only their friends and the people in their groups. */
+  publicProfile?: boolean;
 }
 
 /** How you stand with someone: friends, you asked them, they asked you, or neither. */
@@ -98,9 +105,54 @@ export type FriendRequestResult =
   | { result: 'not_found' | 'self' | 'need_name' | 'too_many' }
   | { result: 'sent' | 'already_sent' | 'already_friends' | 'now_friends'; name: string };
 
+/** A circle of people, like a family, that loved ones can be shared with. */
+export interface Group {
+  id: string;
+  name: string;
+  ownerId: string;
+  createdAt: number;
+}
+
+/** Someone in a group, or invited to it. Members see everyone; people invited only see their own invitation. */
+export interface GroupMember {
+  groupId: string;
+  userId: string;
+  status: 'invited' | 'member';
+  /** Who sent the invitation. */
+  invitedBy?: string;
+  createdAt: number;
+}
+
+export type CreateGroupResult = { result: 'need_name' | 'bad_name' | 'too_many' } | { result: 'created'; id: string };
+
+/** What happened when you invited someone to a group. */
+export type GroupInviteResult =
+  | { result: 'not_found' | 'self' | 'need_name' | 'too_many' | 'full' }
+  | { result: 'invited' | 'already_invited' | 'already_member'; name: string };
+
+/** A quote or story, or a loved one: the things that can be liked, commented on and reported. */
+export type Target = { ismId: string; lovedOneId?: undefined } | { lovedOneId: string; ismId?: undefined };
+
+export interface Like {
+  userId: string;
+  ismId?: string;
+  lovedOneId?: string;
+}
+
+export interface Comment {
+  id: string;
+  authorId: string;
+  ismId?: string;
+  lovedOneId?: string;
+  body: string;
+  /** Only the author sees their own comments that wait for a reviewer or were removed. */
+  reviewStatus: ReviewStatus;
+  createdAt: number;
+}
+
 /** Something shared that's waiting for a reviewer: held for its words, or reported. */
 export interface ReviewItem {
-  kind: 'ism' | 'loved_one';
+  kind: 'ism' | 'loved_one' | 'comment';
   id: string;
   lovedOneId: string;
   lovedOneName: string;

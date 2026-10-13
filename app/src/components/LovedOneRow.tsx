@@ -2,28 +2,40 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { COMMUNITY_OWNER } from '../lib/seed';
 import { useStore } from '../lib/store';
 import { cardStyle, colors, space } from '../lib/theme';
-import type { LovedOne, Visibility } from '../lib/types';
+import { timeAgo } from '../lib/time';
+import type { LovedOne } from '../lib/types';
 import { Avatar } from './Avatar';
+import { ReactionCounts } from './Reactions';
+import { SharedBy } from './SharedBy';
 
-export const SHARED_WITH: Record<Visibility, string> = {
-  private: 'Only you',
-  friends: 'Shared with friends',
-  public: 'Shared with everyone',
-};
+/** Who can see your own loved one, in a few words. */
+export function sharedWithLabel(lovedOne: Pick<LovedOne, 'visibility'>, groupName?: string): string {
+  switch (lovedOne.visibility) {
+    case 'private':
+      return 'Only you';
+    case 'friends':
+      return 'Shared with friends';
+    case 'group':
+      return groupName ? `Shared with ${groupName}` : 'Shared with a group';
+    case 'public':
+      return 'Shared with everyone';
+  }
+}
 
 /**
- * A loved one in a list. The last line says how many memories they have and who shared them,
- * unless `note` replaces it (the feed uses it for "Shared by Ann · 2 days ago").
+ * A loved one in a list. The last line says how many memories they have (`count`) and who shared them.
+ * In the feed, `at` says when they were added instead, and their likes and comments are counted.
  */
-export function LovedOneRow({ lovedOne, count, note }: { lovedOne: LovedOne; count?: number; note?: string }) {
-  const { userId, sharedBy } = useStore();
+export function LovedOneRow({ lovedOne, count, at }: { lovedOne: LovedOne; count?: number; at?: number }) {
+  const { userId, getGroup } = useStore();
   const mine = lovedOne.ownerId === userId;
-  const details = [
-    count === undefined ? undefined : `${count} ${count === 1 ? 'memory' : 'memories'}`,
-    mine ? SHARED_WITH[lovedOne.visibility] : sharedBy(lovedOne.ownerId),
-  ].filter(Boolean);
+  const example = lovedOne.ownerId === COMMUNITY_OWNER;
+  const memories = count === undefined ? undefined : `${count} ${count === 1 ? 'memory' : 'memories'}`;
+  const when = at !== undefined && !example ? timeAgo(at) : undefined;
+  const group = lovedOne.groupId ? getGroup(lovedOne.groupId) : undefined;
 
   return (
     <Pressable
@@ -35,7 +47,18 @@ export function LovedOneRow({ lovedOne, count, note }: { lovedOne: LovedOne; cou
         {lovedOne.relationship || lovedOne.years ? (
           <Text style={styles.meta}>{[lovedOne.relationship, lovedOne.years].filter(Boolean).join(' · ')}</Text>
         ) : null}
-        <Text style={[styles.meta, styles.note]}>{note ?? details.join('  ·  ')}</Text>
+        {mine ? (
+          <Text style={[styles.meta, styles.note]}>
+            {[memories, when ? 'Added by you' : sharedWithLabel(lovedOne, group?.name), when].filter(Boolean).join('  ·  ')}
+          </Text>
+        ) : (
+          <SharedBy
+            lovedOne={lovedOne}
+            after={[memories, when].filter(Boolean).map((part) => `  ·  ${part}`).join('')}
+            style={{ ...styles.meta, ...styles.note }}
+          />
+        )}
+        {at !== undefined && !example ? <ReactionCounts target={{ lovedOneId: lovedOne.id }} /> : null}
       </View>
       <Ionicons name="chevron-forward" size={20} color={colors.muted} />
     </Pressable>

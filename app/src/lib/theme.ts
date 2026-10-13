@@ -11,6 +11,8 @@ export const colors = {
   border: '#DDE9E7',
   danger: '#C2554F',
   dangerSoft: '#FBECEA',
+  /** A liked heart. */
+  heart: '#D9615B',
 };
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };

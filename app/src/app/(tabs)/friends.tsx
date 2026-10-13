@@ -1,15 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { NameField } from '../../components/NameField';
 import { PersonRow, mutualFriendsNote } from '../../components/PersonRow';
-import { Button, Card, ErrorNote, TextButton, styles } from '../../components/ui';
+import { openGroup } from '../../components/SharedBy';
+import { Button, Card, ErrorNote, Field, TextButton, styles } from '../../components/ui';
 import { contactsAvailable } from '../../lib/contacts';
 import { useStore } from '../../lib/store';
-import { colors, radius, space } from '../../lib/theme';
-import type { FriendRequestResult, PersonResult, Relationship } from '../../lib/types';
+import { cardStyle, colors, radius, space } from '../../lib/theme';
+import type { FriendRequestResult, Group, PersonResult, Relationship } from '../../lib/types';
 
 const WEBSITE = 'https://vipbdiddy.github.io/isms/';
 
@@ -55,6 +56,10 @@ export default function Friends() {
     sendFriendRequest,
     answerFriendRequest,
     removeFriend,
+    groups,
+    groupInvites,
+    membersOf,
+    answerGroupInvite,
     loading,
     refresh,
   } = useStore();
@@ -198,7 +203,15 @@ export default function Friends() {
       ) : (
         <Button small title="Add friend" icon="person-add-outline" onPress={() => ask(person)} />
       );
-    return <PersonRow key={person.id} name={person.displayName} note={mutualFriendsNote(person.mutualFriends)} action={action} />;
+    return (
+      <PersonRow
+        key={person.id}
+        personId={person.id}
+        name={person.displayName}
+        note={mutualFriendsNote(person.mutualFriends)}
+        action={action}
+      />
+    );
   };
 
   return (
@@ -306,7 +319,7 @@ export default function Friends() {
         <>
           <Text style={styles.subheading}>Friend requests</Text>
           {incoming.map((f) => (
-            <PersonRow key={f.otherId} name={nameOf(f.otherId)} note="Wants to be friends">
+            <PersonRow key={f.otherId} personId={f.otherId} name={nameOf(f.otherId)} note="Wants to be friends">
               <View style={local.row}>
                 <View style={{ flex: 1 }}>
                   <Button title="Accept" onPress={() => accept(f.otherId)} />
@@ -324,12 +337,44 @@ export default function Friends() {
         </>
       )}
 
+      {groupInvites.length > 0 && (
+        <>
+          <Text style={styles.subheading}>Group invitations</Text>
+          {groupInvites.map((invite) => (
+            <View key={invite.group.id} style={local.invite}>
+              <Pressable onPress={() => openGroup(invite.group.id)} accessibilityRole="link">
+                <Text style={local.groupName}>{invite.group.name}</Text>
+                <Text style={styles.muted}>
+                  {invite.invitedBy ? nameOf(invite.invitedBy) || 'Someone' : 'Someone'} invited you to join
+                </Text>
+              </Pressable>
+              <View style={local.row}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="No thanks"
+                    variant="secondary"
+                    onPress={() => act(() => answerGroupInvite(invite.group.id, false), 'Couldn’t answer.')}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Join"
+                    onPress={() => act(() => answerGroupInvite(invite.group.id, true), 'Couldn’t join.')}
+                  />
+                </View>
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+
       {outgoing.length > 0 && (
         <>
           <Text style={styles.subheading}>Waiting for them to accept</Text>
           {outgoing.map((f) => (
             <PersonRow
               key={f.otherId}
+              personId={f.otherId}
               name={nameOf(f.otherId)}
               note="Request sent"
               action={<TextButton title="Cancel" color={colors.muted} onPress={() => cancel(f.otherId)} />}
@@ -345,6 +390,7 @@ export default function Friends() {
         friends.map((f) => (
           <FriendRow
             key={f.otherId}
+            id={f.otherId}
             name={nameOf(f.otherId)}
             note={sharedWithYou(f.otherId)}
             onRemove={() => act(() => removeFriend(f.otherId), 'Couldn’t remove them.')}
@@ -352,15 +398,105 @@ export default function Friends() {
         ))
       )}
 
+      <Text style={styles.subheading}>Your groups</Text>
+      <Text style={styles.muted}>
+        A group is a circle like your family. Share a loved one with a group, and everyone in it can see them.
+      </Text>
+      {groups.map((group) => (
+        <GroupRow key={group.id} group={group} members={membersOf(group.id).filter((m) => m.status === 'member').length} />
+      ))}
+      <NewGroup />
+
       <Button title="Invite someone to Ism’s" icon="share-outline" variant="secondary" onPress={invite} />
     </ScrollView>
   );
 }
 
-function FriendRow({ name, note, onRemove }: { name: string; note: string; onRemove: () => void }) {
+function GroupRow({ group, members }: { group: Group; members: number }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [local.group, pressed && { opacity: 0.9 }]}
+      onPress={() => openGroup(group.id)}
+      accessibilityRole="link">
+      <View style={local.groupIcon}>
+        <Ionicons name="people" size={22} color={colors.accent} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={local.groupName}>{group.name}</Text>
+        <Text style={styles.muted}>
+          {members} {members === 1 ? 'member' : 'members'}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+    </Pressable>
+  );
+}
+
+/** "Make a group": a name, then off to the new group's page to invite people. */
+function NewGroup() {
+  const { createGroup } = useStore();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [making, setMaking] = useState(false);
+  const [error, setError] = useState<string>();
+
+  if (!open) return <Button title="Make a group" icon="people-outline" variant="secondary" onPress={() => setOpen(true)} />;
+
+  const make = async () => {
+    setMaking(true);
+    setError(undefined);
+    try {
+      const result = await createGroup(name.trim());
+      if (result.result === 'created') {
+        setOpen(false);
+        setName('');
+        openGroup(result.id);
+      } else {
+        setError(
+          result.result === 'too_many'
+            ? 'You’ve made a lot of groups. Delete one you don’t use first.'
+            : result.result === 'need_name'
+              ? 'Add your name first, so the people you invite know who you are.'
+              : 'Give the group a name.',
+        );
+      }
+    } catch (e) {
+      console.warn('Could not make the group', e);
+      setError('Couldn’t make the group. Check your connection and try again.');
+    } finally {
+      setMaking(false);
+    }
+  };
+
+  return (
+    <Card>
+      <Field
+        label="Group name"
+        placeholder="The Lee family, Grandma’s grandkids…"
+        value={name}
+        onChangeText={setName}
+        maxLength={60}
+        autoFocus
+        onSubmitEditing={make}
+        returnKeyType="done"
+      />
+      {error ? <ErrorNote message={error} /> : null}
+      <View style={local.row}>
+        <View style={{ flex: 1 }}>
+          <Button title="Cancel" variant="secondary" onPress={() => setOpen(false)} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button title={making ? 'Making it…' : 'Make it'} onPress={make} disabled={!name.trim() || making} />
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+function FriendRow({ id, name, note, onRemove }: { id: string; name: string; note: string; onRemove: () => void }) {
   const [asking, setAsking] = useState(false);
   return (
-    <PersonRow name={name} note={note}>
+    <PersonRow personId={id} name={name} note={note}>
       {asking ? (
         <View style={{ gap: space.sm }}>
           <Text style={styles.body}>
@@ -396,5 +532,16 @@ const local = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 16, color: colors.ink, paddingVertical: 12 },
   row: { flexDirection: 'row', gap: space.sm },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  invite: { ...cardStyle, padding: space.md, gap: space.md },
+  group: { ...cardStyle, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md },
+  groupIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupName: { fontSize: 17, fontWeight: '600', color: colors.ink },
   tagText: { fontSize: 14, fontWeight: '600', color: colors.muted },
 });

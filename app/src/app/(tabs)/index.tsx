@@ -6,10 +6,8 @@ import { IsmCard } from '../../components/IsmCard';
 import { LovedOneRow } from '../../components/LovedOneRow';
 import { Button, Card, Chip, ErrorNote, ScopeToggle, TextButton, styles } from '../../components/ui';
 import { feed, visibleIsms } from '../../lib/advice';
-import { COMMUNITY_OWNER } from '../../lib/seed';
 import { useStore } from '../../lib/store';
 import { colors, space } from '../../lib/theme';
-import { timeAgo } from '../../lib/time';
 import { TOPICS } from '../../lib/topics';
 import type { Scope } from '../../lib/types';
 import { useScope } from '../../lib/useScope';
@@ -21,7 +19,7 @@ const FEED_PAGE = 10;
 
 const FEED_TITLES: Record<Scope, string> = {
   mine: 'Your latest',
-  friends: 'Latest from you and your friends',
+  friends: 'Latest from you, your friends and your groups',
   everyone: 'Latest from everyone',
 };
 
@@ -35,7 +33,6 @@ export default function Home() {
     friendIds,
     settings,
     savedIsmIds,
-    sharedBy,
     notice,
     dismissNotice,
     isAdmin,
@@ -129,16 +126,7 @@ export default function Home() {
             item.type === 'ism' ? (
               <IsmCard key={item.id} ism={item.ism} showTime />
             ) : (
-              <LovedOneRow
-                key={item.id}
-                lovedOne={item.lovedOne}
-                note={[
-                  sharedBy(item.lovedOne.ownerId) ?? 'Added by you',
-                  item.lovedOne.ownerId === COMMUNITY_OWNER ? undefined : timeAgo(item.at),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              />
+              <LovedOneRow key={item.id} lovedOne={item.lovedOne} at={item.at} />
             ),
           )}
           {items.length > shown ? (

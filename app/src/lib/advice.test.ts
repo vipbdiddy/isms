@@ -7,15 +7,24 @@ import type { Ism, LovedOne } from './types.ts';
 
 const ME = 'me';
 const FRIEND = 'friend';
-const me: Viewer = { userId: ME, friendIds: new Set([FRIEND]) };
-const stranger: Viewer = { userId: 'stranger', friendIds: new Set() };
-const signedOut: Viewer = { userId: '', friendIds: new Set() };
-const lovedOne = (id: string, ownerId: string, visibility: LovedOne['visibility'], createdAt = 0): LovedOne => ({
+const COUSIN = 'cousin'; // in my family group, not my friend
+const FAMILY = 'family-group';
+const me: Viewer = { userId: ME, friendIds: new Set([FRIEND]), groupIds: new Set([FAMILY]) };
+const stranger: Viewer = { userId: 'stranger', friendIds: new Set(), groupIds: new Set() };
+const signedOut: Viewer = { userId: '', friendIds: new Set(), groupIds: new Set() };
+const lovedOne = (
+  id: string,
+  ownerId: string,
+  visibility: LovedOne['visibility'],
+  createdAt = 0,
+  groupId?: string,
+): LovedOne => ({
   id,
   ownerId,
   name: id,
   relationship: 'Grandma',
   visibility,
+  groupId,
   createdAt,
 });
 const ism = (id: string, lovedOneId: string, ownerId: string, topics: string[], text = 'words', extra: Partial<Ism> = {}): Ism => ({
@@ -52,7 +61,7 @@ test('you always see your own isms; others only when their family made them publ
 test('friends-only loved ones are seen by the owner and their friends, nobody else', () => {
   const friendsOnly = byId('friendsOnly')!;
   assert.equal(canSeeLovedOne(friendsOnly, me), true);
-  assert.equal(canSeeLovedOne(friendsOnly, { userId: FRIEND, friendIds: new Set() }), true);
+  assert.equal(canSeeLovedOne(friendsOnly, { userId: FRIEND, friendIds: new Set(), groupIds: new Set() }), true);
   assert.equal(canSeeLovedOne(friendsOnly, stranger), false);
   assert.equal(canSeeLovedOne(friendsOnly, signedOut), false);
   assert.equal(canSeeLovedOne(byId('friendsPrivate')!, me), false);
@@ -66,7 +75,7 @@ test('only owners see what waits for a reviewer or was removed', () => {
   const held = { ...lovedOne('held', FRIEND, 'public'), reviewStatus: 'pending' as const };
   const allowed = { ...lovedOne('allowed', FRIEND, 'public'), reviewStatus: 'approved' as const };
   assert.equal(canSeeLovedOne(held, me), false);
-  assert.equal(canSeeLovedOne(held, { userId: FRIEND, friendIds: new Set() }), true);
+  assert.equal(canSeeLovedOne(held, { userId: FRIEND, friendIds: new Set(), groupIds: new Set() }), true);
   assert.equal(canSeeLovedOne(allowed, me), true);
   const fine = byId('theirsPublic');
   assert.equal(canSee(ism('8', 'theirsPublic', 'other', [], 'x', { reviewStatus: 'pending' }), fine, me), false);
@@ -91,6 +100,38 @@ test('scopes: "mine", then "friends" adds your friends\', then "everyone" adds p
   assert.deepEqual(ids('friends'), ['1', '4']);
   assert.deepEqual(ids('everyone'), ['1', '2', '4']);
   assert.deepEqual(ids('everyone', signedOut), ['2']);
+});
+
+test('loved ones shared with a group are seen by its members, nobody else', () => {
+  const grandpa = lovedOne('grandpa', COUSIN, 'group', 0, FAMILY);
+  assert.equal(canSeeLovedOne(grandpa, me), true);
+  assert.equal(canSeeLovedOne(grandpa, stranger), false);
+  assert.equal(canSeeLovedOne(grandpa, signedOut), false);
+  assert.equal(canSeeLovedOne(grandpa, { ...me, groupIds: new Set(['another-group']) }), false);
+  // Being the owner's friend isn't enough.
+  assert.equal(canSeeLovedOne(grandpa, { userId: 'pal', friendIds: new Set([COUSIN]), groupIds: new Set() }), false);
+  // "A group" that doesn't say which group is private.
+  assert.equal(canSeeLovedOne(lovedOne('lost', COUSIN, 'group'), me), false);
+  assert.equal(canSee(ism('g', 'grandpa', COUSIN, []), grandpa, me), true);
+  assert.equal(canSee(ism('g2', 'grandpa', COUSIN, [], 'x', { keepPrivate: true }), grandpa, me), false);
+  assert.equal(canSee(ism('g3', 'grandpa', COUSIN, []), grandpa, stranger), false);
+});
+
+test('"friends" includes what your groups share; "mine" doesn\'t', () => {
+  const people = [
+    lovedOne('grandpa', COUSIN, 'group', 0, FAMILY),
+    lovedOne('cousinsPublic', COUSIN, 'public'),
+    lovedOne('mineInGroup', ME, 'group', 0, FAMILY),
+  ];
+  const memories = [ism('g', 'grandpa', COUSIN, []), ism('p', 'cousinsPublic', COUSIN, []), ism('m', 'mineInGroup', ME, [])];
+  const ids = (scope: 'mine' | 'friends' | 'everyone') => visibleIsms(memories, people, me, scope).map((i) => i.id);
+  assert.deepEqual(ids('mine'), ['m']);
+  assert.deepEqual(ids('friends'), ['g', 'm']);
+  assert.deepEqual(ids('everyone'), ['g', 'p', 'm']);
+  assert.deepEqual(
+    feed(memories, people, me, 'friends').map((item) => item.id),
+    ['ism-g', 'ism-m', 'loved-one-grandpa', 'loved-one-mineInGroup'],
+  );
 });
 
 test('the feed lists new memories and new loved ones, newest first', () => {

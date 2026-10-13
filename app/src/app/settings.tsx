@@ -9,7 +9,8 @@ import { useStore } from '../lib/store';
 import { colors, space } from '../lib/theme';
 
 export default function SettingsScreen() {
-  const { settings, updateSettings, session, userId, profile, setDiscoverable, isAdmin, reviewCount } = useStore();
+  const { settings, updateSettings, session, userId, profile, setDiscoverable, setPublicProfile, isAdmin, reviewCount } =
+    useStore();
   const [error, setError] = useState<string>();
 
   return (
@@ -45,12 +46,20 @@ export default function SettingsScreen() {
 
       <Text style={styles.subheading}>About you</Text>
       <NameField />
+      {profile ? (
+        <Button
+          title="See your profile"
+          icon="person-circle-outline"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/person/[id]', params: { id: userId } })}
+        />
+      ) : null}
 
       <Text style={styles.subheading}>Whose memories to show at first</Text>
       <ScopeToggle value={settings.defaultScope} onChange={(defaultScope) => updateSettings({ defaultScope })} />
       <Text style={styles.muted}>
-        “Mine” shows only the people you’ve added. “Friends” adds what your friends share with you. “Everyone” also
-        includes what other families share with everyone. You can always switch on any screen.
+        “Mine” shows only the people you’ve added. “Friends” adds what your friends and your groups share with you.
+        “Everyone” also includes what other families share with everyone. You can always switch on any screen.
       </Text>
 
       <Text style={styles.subheading}>Privacy</Text>
@@ -77,10 +86,34 @@ export default function SettingsScreen() {
           />
         </View>
       ) : null}
+      {profile ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Public profile</Text>
+            <Text style={styles.hint}>
+              Anyone on Ism’s can see your name on what you share with everyone, and open your profile to see it in one
+              place. When this is off, only your friends and the people in your groups can.
+            </Text>
+          </View>
+          <Switch
+            value={profile.publicProfile === true}
+            onValueChange={(on) =>
+              setPublicProfile(on).catch((e) => {
+                console.warn('Could not save', e);
+                setError('Couldn’t save that. Check your connection and try again.');
+              })
+            }
+            trackColor={{ true: colors.accent, false: colors.border }}
+            thumbColor={colors.card}
+            accessibilityLabel="Public profile"
+          />
+        </View>
+      ) : null}
       <Text style={styles.muted}>
-        Everything you add is private until you share a loved one with your friends or with everyone. Even then, you
-        can keep single quotes or stories private. Shared memories that might hurt someone are checked by Ism’s before
-        others can see them. Other people see your name, never your email address.
+        Everything you add is private until you share a loved one with your friends, a group or everyone. Even then,
+        you can keep single quotes or stories private. Shared memories and comments that might hurt someone are checked
+        by Ism’s before others can see them. Other people see your name, never your email address. Your name always
+        shows with your comments and likes.
       </Text>
 
       {error ? <ErrorNote message={error} /> : null}

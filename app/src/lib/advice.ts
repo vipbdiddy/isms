@@ -1,10 +1,11 @@
 import { TOPICS } from './topics.ts';
 import type { Ism, KindFilter, LovedOne, ReviewStatus, Scope } from './types.ts';
 
-/** Who is looking: their id ('' when signed out) and the ids of their friends. */
+/** Who is looking: their id ('' when signed out), the ids of their friends, and of the groups they're in. */
 export interface Viewer {
   userId: string;
   friendIds: ReadonlySet<string>;
+  groupIds: ReadonlySet<string>;
 }
 
 /** Whether others may see something: not while it waits for a reviewer, or after one removed it. */
@@ -12,15 +13,22 @@ export function passedReview(item: { reviewStatus?: ReviewStatus }): boolean {
   return item.reviewStatus === undefined || item.reviewStatus === 'ok' || item.reviewStatus === 'approved';
 }
 
+/** Whether a loved one is shared with one of the viewer's groups. */
+export function sharedWithMyGroup(lovedOne: Pick<LovedOne, 'visibility' | 'groupId'>, viewer: Viewer): boolean {
+  return lovedOne.visibility === 'group' && !!lovedOne.groupId && viewer.groupIds.has(lovedOne.groupId);
+}
+
 /**
  * Whether someone may see a loved one: always their own; otherwise only if the family shared them
- * with everyone, or with their friends and the viewer is one. Mirrors the rules in supabase/schema.sql.
+ * with everyone, with their friends and the viewer is one, or with a group the viewer is in.
+ * Mirrors the rules in supabase/schema.sql.
  */
 export function canSeeLovedOne(lovedOne: LovedOne, viewer: Viewer): boolean {
   if (lovedOne.ownerId === viewer.userId) return true;
   if (!passedReview(lovedOne)) return false;
   if (lovedOne.visibility === 'public') return true;
-  return lovedOne.visibility === 'friends' && viewer.friendIds.has(lovedOne.ownerId);
+  if (lovedOne.visibility === 'friends') return viewer.friendIds.has(lovedOne.ownerId);
+  return sharedWithMyGroup(lovedOne, viewer);
 }
 
 /** Whether someone may see an ism: always their own; otherwise only if its loved one is shared with them. */
@@ -34,17 +42,21 @@ export function isShared(ism: Ism | undefined, lovedOne: LovedOne): boolean {
   return lovedOne.visibility !== 'private' && !ism?.keepPrivate;
 }
 
-/** Whether something added by `ownerId` belongs in a scope. Each scope includes the one before it. */
-export function inScope(ownerId: string, viewer: Viewer, scope: Scope): boolean {
-  if (scope === 'everyone' || ownerId === viewer.userId) return true;
-  return scope === 'friends' && viewer.friendIds.has(ownerId);
+/**
+ * Whether a loved one (and so their memories) belongs in a scope. Each scope includes the one before it:
+ * "friends" adds what friends share and what's shared with your groups, "everyone" the rest.
+ */
+export function inScope(lovedOne: LovedOne, viewer: Viewer, scope: Scope): boolean {
+  if (scope === 'everyone' || lovedOne.ownerId === viewer.userId) return true;
+  return scope === 'friends' && (viewer.friendIds.has(lovedOne.ownerId) || sharedWithMyGroup(lovedOne, viewer));
 }
 
 export function visibleIsms(isms: Ism[], lovedOnes: LovedOne[], viewer: Viewer, scope: Scope): Ism[] {
   const byId = new Map(lovedOnes.map((l) => [l.id, l]));
-  return isms.filter(
-    (ism) => canSee(ism, byId.get(ism.lovedOneId), viewer) && inScope(ism.ownerId, viewer, scope),
-  );
+  return isms.filter((ism) => {
+    const lovedOne = byId.get(ism.lovedOneId);
+    return canSee(ism, lovedOne, viewer) && (lovedOne ? inScope(lovedOne, viewer, scope) : ism.ownerId === viewer.userId);
+  });
 }
 
 /** One entry in the home feed: a new quote or story, or a newly added loved one. */
@@ -55,7 +67,7 @@ export type FeedItem =
 /** Everything in a scope that the viewer may see, newest first. */
 export function feed(isms: Ism[], lovedOnes: LovedOne[], viewer: Viewer, scope: Scope): FeedItem[] {
   const people: FeedItem[] = lovedOnes
-    .filter((l) => canSeeLovedOne(l, viewer) && inScope(l.ownerId, viewer, scope))
+    .filter((l) => canSeeLovedOne(l, viewer) && inScope(l, viewer, scope))
     .map((l) => ({ type: 'lovedOne', id: `loved-one-${l.id}`, at: l.createdAt, lovedOne: l }));
   const memories: FeedItem[] = visibleIsms(isms, lovedOnes, viewer, scope).map((ism) => ({
     type: 'ism',

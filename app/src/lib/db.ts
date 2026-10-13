@@ -1,15 +1,22 @@
 import { supabase } from './supabase';
 import type {
+  Comment,
+  CreateGroupResult,
   FriendRequestResult,
   Friendship,
+  Group,
+  GroupInviteResult,
+  GroupMember,
   Ism,
   IsmInput,
+  Like,
   LovedOne,
   LovedOneInput,
   PersonResult,
   Profile,
   ReviewItem,
   ReviewStatus,
+  Target,
   Visibility,
 } from './types';
 
@@ -24,6 +31,7 @@ interface LovedOneRow {
   obituary: string | null;
   photo_path: string | null;
   visibility: Visibility;
+  group_id: string | null;
   review_status: ReviewStatus;
   created_at: string;
 }
@@ -46,6 +54,38 @@ interface ProfileRow {
   id: string;
   display_name: string;
   discoverable: boolean;
+  public_profile: boolean;
+}
+
+interface GroupRow {
+  id: string;
+  name: string;
+  owner_id: string;
+  created_at: string;
+}
+
+interface GroupMemberRow {
+  group_id: string;
+  user_id: string;
+  status: GroupMember['status'];
+  invited_by: string | null;
+  created_at: string;
+}
+
+interface LikeRow {
+  user_id: string;
+  ism_id: string | null;
+  loved_one_id: string | null;
+}
+
+interface CommentRow {
+  id: string;
+  author_id: string;
+  ism_id: string | null;
+  loved_one_id: string | null;
+  body: string;
+  review_status: ReviewStatus;
+  created_at: string;
 }
 
 interface PersonRow {
@@ -90,6 +130,7 @@ const toLovedOne = (r: LovedOneRow): LovedOne => ({
   obituary: orUndefined(r.obituary),
   photoPath: orUndefined(r.photo_path),
   visibility: r.visibility,
+  groupId: orUndefined(r.group_id),
   reviewStatus: r.review_status,
   createdAt: Date.parse(r.created_at),
 });
@@ -104,6 +145,16 @@ const toIsm = (r: IsmRow): Ism => ({
   context: orUndefined(r.context),
   topics: r.topics,
   keepPrivate: r.keep_private,
+  reviewStatus: r.review_status,
+  createdAt: Date.parse(r.created_at),
+});
+
+const toComment = (r: CommentRow): Comment => ({
+  id: r.id,
+  authorId: r.author_id,
+  ismId: orUndefined(r.ism_id),
+  lovedOneId: orUndefined(r.loved_one_id),
+  body: r.body,
   reviewStatus: r.review_status,
   createdAt: Date.parse(r.created_at),
 });
@@ -123,6 +174,7 @@ const lovedOneColumns = (input: Partial<LovedOneInput> & { photoPath?: string | 
   if ('about' in input) row.about = input.about ?? null;
   if ('obituary' in input) row.obituary = input.obituary ?? null;
   if ('visibility' in input) row.visibility = input.visibility;
+  if ('groupId' in input) row.group_id = input.groupId ?? null;
   if ('photoPath' in input) row.photo_path = input.photoPath ?? null;
   return row;
 };
@@ -139,20 +191,34 @@ const ismColumns = (input: Partial<IsmInput>) => {
   return row;
 };
 
-/** Everything this person may see: their own loved ones and every family's shared ones. */
+const none = Promise.resolve({ data: [], error: null });
+
+/**
+ * Everything this person may see: their own loved ones and every family's shared ones, and (signed in)
+ * the likes and comments on them.
+ */
 export async function fetchAll(userId: string | null) {
-  const [lovedOnes, isms, saved] = await Promise.all([
+  const [lovedOnes, isms, saved, likes, comments] = await Promise.all([
     supabase.from('loved_ones').select('*').order('created_at'),
     supabase.from('isms').select('*').order('created_at', { ascending: false }),
-    userId ? supabase.from('saved_isms').select('ism_id') : Promise.resolve({ data: [], error: null }),
+    userId ? supabase.from('saved_isms').select('ism_id') : none,
+    userId ? supabase.from('likes').select('user_id, ism_id, loved_one_id').order('created_at', { ascending: false }) : none,
+    userId ? supabase.from('comments').select('*').order('created_at') : none,
   ]);
   if (lovedOnes.error) throw lovedOnes.error;
   if (isms.error) throw isms.error;
   if (saved.error) throw saved.error;
+  // Likes and comments are extras: if they can't load (say the database is a version behind), the memories still show.
+  if (likes.error) console.warn('Could not load likes', likes.error);
+  if (comments.error) console.warn('Could not load comments', comments.error);
   return {
     lovedOnes: (lovedOnes.data as LovedOneRow[]).map(toLovedOne),
     isms: (isms.data as IsmRow[]).map(toIsm),
     savedIsmIds: (saved.data as { ism_id: string }[]).map((r) => r.ism_id),
+    likes: ((likes.data ?? []) as LikeRow[]).map(
+      (r): Like => ({ userId: r.user_id, ismId: orUndefined(r.ism_id), lovedOneId: orUndefined(r.loved_one_id) }),
+    ),
+    comments: ((comments.data ?? []) as CommentRow[]).map(toComment),
   };
 }
 
@@ -198,23 +264,44 @@ export async function setSaved(ismId: string, saved: boolean) {
 }
 
 /**
- * Your own profile, the names of the people you're connected to, your friends and friend requests,
- * and whether you review shared memories.
+ * Your own profile, the names of the people you may see, your friends and friend requests, your groups
+ * and group invitations, and whether you review shared memories.
  */
 export async function fetchFriends(userId: string) {
-  const [profiles, friendships, admin] = await Promise.all([
-    supabase.from('profiles').select('id, display_name, discoverable'),
+  const [profiles, friendships, admin, groups, members] = await Promise.all([
+    supabase.from('profiles').select('id, display_name, discoverable, public_profile'),
     supabase.from('friendships').select('requester, addressee, status, created_at').order('created_at', { ascending: false }),
     supabase.rpc('is_admin'),
+    supabase.from('groups').select('*').order('name'),
+    supabase.from('group_members').select('group_id, user_id, status, invited_by, created_at').order('created_at'),
   ]);
   if (profiles.error) throw profiles.error;
   if (friendships.error) throw friendships.error;
+  // Trouble with groups never hides your friends.
+  if (groups.error) console.warn('Could not load groups', groups.error);
+  if (members.error) console.warn('Could not load group members', members.error);
   const rows = profiles.data as ProfileRow[];
   const mine = rows.find((r) => r.id === userId);
   return {
-    me: mine ? { id: mine.id, displayName: mine.display_name, discoverable: mine.discoverable } : null,
+    me: mine
+      ? { id: mine.id, displayName: mine.display_name, discoverable: mine.discoverable, publicProfile: mine.public_profile }
+      : null,
     isAdmin: admin.data === true,
-    others: rows.filter((r) => r.id !== userId).map((r): Profile => ({ id: r.id, displayName: r.display_name })),
+    others: rows
+      .filter((r) => r.id !== userId)
+      .map((r): Profile => ({ id: r.id, displayName: r.display_name, publicProfile: r.public_profile })),
+    groups: ((groups.data ?? []) as GroupRow[]).map(
+      (r): Group => ({ id: r.id, name: r.name, ownerId: r.owner_id, createdAt: Date.parse(r.created_at) }),
+    ),
+    groupMembers: ((members.data ?? []) as GroupMemberRow[]).map(
+      (r): GroupMember => ({
+        groupId: r.group_id,
+        userId: r.user_id,
+        status: r.status,
+        invitedBy: orUndefined(r.invited_by),
+        createdAt: Date.parse(r.created_at),
+      }),
+    ),
     friendships: (friendships.data as FriendshipRow[]).map(
       (r): Friendship => ({
         otherId: r.requester === userId ? r.addressee : r.requester,
@@ -257,10 +344,14 @@ export async function removeFriend(otherId: string) {
   if (error) throw error;
 }
 
-export async function updateMyProfile(userId: string, changes: { displayName?: string; discoverable?: boolean }) {
+export async function updateMyProfile(
+  userId: string,
+  changes: { displayName?: string; discoverable?: boolean; publicProfile?: boolean },
+) {
   const row: Partial<ProfileRow> = {};
   if (changes.displayName !== undefined) row.display_name = changes.displayName;
   if (changes.discoverable !== undefined) row.discoverable = changes.discoverable;
+  if (changes.publicProfile !== undefined) row.public_profile = changes.publicProfile;
   const { error } = await supabase.from('profiles').update(row).eq('id', userId).select('id').single();
   if (error) throw error;
 }
@@ -299,5 +390,88 @@ export async function contentToReview(): Promise<ReviewItem[]> {
 /** Reviewers only: allow something (everyone it's shared with sees it) or remove it (only its owner does). */
 export async function reviewContent(kind: ReviewItem['kind'], id: string, allow: boolean) {
   const { error } = await supabase.rpc('review_content', { item_kind: kind, item_id: id, allow });
+  if (error) throw error;
+}
+
+// Groups -----------------------------------------------------------------------------
+
+export async function createGroup(name: string) {
+  const { data, error } = await supabase.rpc('create_group', { group_name: name });
+  if (error) throw error;
+  return data as CreateGroupResult;
+}
+
+export async function renameGroup(groupId: string, name: string) {
+  const { error } = await supabase.rpc('rename_group', { target_group: groupId, group_name: name });
+  if (error) throw error;
+}
+
+/** The owner only. Loved ones shared with the group become private again. */
+export async function deleteGroup(groupId: string) {
+  const { error } = await supabase.rpc('delete_group', { target_group: groupId });
+  if (error) throw error;
+}
+
+export async function inviteToGroup(groupId: string, userId: string) {
+  const { data, error } = await supabase.rpc('invite_to_group', { target_group: groupId, other_id: userId });
+  if (error) throw error;
+  return data as GroupInviteResult;
+}
+
+export async function answerGroupInvite(groupId: string, accept: boolean) {
+  const { error } = await supabase.rpc('respond_to_group_invite', { target_group: groupId, accept });
+  if (error) throw error;
+}
+
+/** Your loved ones shared with the group become private again. */
+export async function leaveGroup(groupId: string) {
+  const { error } = await supabase.rpc('leave_group', { target_group: groupId });
+  if (error) throw error;
+}
+
+/** The owner removes someone or takes back an invitation; whoever invited someone can take it back too. */
+export async function removeFromGroup(groupId: string, userId: string) {
+  const { error } = await supabase.rpc('remove_from_group', { target_group: groupId, other_id: userId });
+  if (error) throw error;
+}
+
+// Likes and comments ---------------------------------------------------------------
+
+/** The column that says what a like or comment is on. */
+const targetRow = (target: Target): { ism_id?: string; loved_one_id?: string } =>
+  target.ismId !== undefined ? { ism_id: target.ismId } : { loved_one_id: target.lovedOneId };
+
+export async function setLiked(target: Target, liked: boolean) {
+  if (liked) {
+    const { error } = await supabase.from('likes').insert(targetRow(target));
+    // Already liked (say, on another phone) is fine.
+    if (error && error.code !== '23505') throw error;
+  } else {
+    const query = supabase.from('likes').delete();
+    const { error } =
+      target.ismId !== undefined ? await query.eq('ism_id', target.ismId) : await query.eq('loved_one_id', target.lovedOneId);
+    if (error) throw error;
+  }
+}
+
+export async function insertComment(target: Target, body: string) {
+  const { data, error } = await supabase
+    .from('comments')
+    .insert({ ...targetRow(target), body })
+    .select()
+    .single();
+  if (error) throw error;
+  return toComment(data as CommentRow);
+}
+
+/** Your own comment, or anyone's on a memory you shared. */
+export async function removeComment(id: string) {
+  const { error } = await supabase.from('comments').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** Report someone else's comment. It's hidden from you straight away. */
+export async function reportComment(id: string, reason: string) {
+  const { error } = await supabase.rpc('report_comment', { target_comment: id, why: reason });
   if (error) throw error;
 }

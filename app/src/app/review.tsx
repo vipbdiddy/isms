@@ -8,7 +8,18 @@ import { cardStyle, colors, radius, space } from '../lib/theme';
 import { timeAgo } from '../lib/time';
 import type { ReviewItem } from '../lib/types';
 
-const KIND_LABELS = { ism: 'Quote or story', loved_one: 'Loved one' } as const;
+const KIND_LABELS = { ism: 'Quote or story', loved_one: 'Loved one', comment: 'Comment' } as const;
+
+const SHARED_WITH = { private: 'nobody', friends: 'their friends', group: 'a group', public: 'everyone' } as const;
+
+/** "About Grandma Jo · shared by Ann with everyone", or for a comment, who wrote it and where. */
+function whose(item: ReviewItem) {
+  const who = item.ownerName || 'someone';
+  if (item.kind === 'comment') {
+    return `By ${who} on ${item.context ? `a memory of ${item.lovedOneName}` : `${item.lovedOneName}’s page`}, shared with ${SHARED_WITH[item.visibility]}`;
+  }
+  return `${item.kind === 'ism' ? `About ${item.lovedOneName}` : item.lovedOneName} · shared by ${who} with ${SHARED_WITH[item.visibility]}`;
+}
 
 /** Reviewers only: shared memories held for their words, or reported by people who saw them. */
 export default function ReviewScreen() {
@@ -53,8 +64,8 @@ export default function ReviewScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.accent} />}>
       <Text style={styles.muted}>
-        These are shared with friends or everyone, and only their owner can see them until you decide. Allow anything
-        kind or harmless. Remove anything that could hurt, accuse or embarrass someone, even if it’s true.
+        These are shared with friends, a group or everyone, and only whoever wrote them can see them until you decide.
+        Allow anything kind or harmless. Remove anything that could hurt, accuse or embarrass someone, even if it’s true.
       </Text>
       {error ? <ErrorNote message={error} /> : null}
       {items?.length === 0 ? (
@@ -64,13 +75,15 @@ export default function ReviewScreen() {
         <View key={item.id} style={local.card}>
           <Text style={local.kind}>{KIND_LABELS[item.kind]}</Text>
           <Text style={local.whose}>
-            {item.kind === 'ism' ? `About ${item.lovedOneName}` : item.lovedOneName} · shared by{' '}
-            {item.ownerName || 'someone'} with {item.visibility === 'public' ? 'everyone' : 'their friends'} ·{' '}
-            {timeAgo(item.createdAt)}
+            {whose(item)} · {timeAgo(item.createdAt)}
           </Text>
           {item.title ? <Text style={local.title}>{item.title}</Text> : null}
           {item.body ? <Text style={styles.body}>{item.kind === 'ism' && !item.title ? `“${item.body}”` : item.body}</Text> : null}
-          {item.context ? <Text style={[styles.muted, { fontStyle: 'italic' }]}>{item.context}</Text> : null}
+          {item.context ? (
+            <Text style={[styles.muted, { fontStyle: 'italic' }]}>
+              {item.kind === 'comment' ? `On: “${item.context}”` : item.context}
+            </Text>
+          ) : null}
           <View style={local.why}>
             <Ionicons name={item.reportCount ? 'flag-outline' : 'search-outline'} size={16} color={colors.danger} />
             <Text style={local.whyText}>
