@@ -36,7 +36,7 @@ function requestMessage(result: FriendRequestResult): string | undefined {
  * you. Open to themselves, their friends, the people in their groups, and everyone when it's public.
  */
 export default function PersonScreen() {
-  const { id, name: nameFromLink } = useLocalSearchParams<{ id: string; name?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const {
     userId,
     profile,
@@ -61,7 +61,8 @@ export default function PersonScreen() {
   const [changed, setChanged] = useState<Relationship>();
 
   const me = id === userId;
-  const name = ((me ? profile?.displayName : nameOf(id)) || nameFromLink || '').trim();
+  // Only names the app knows (never one from the link, which anyone could write).
+  const name = ((me ? profile?.displayName : nameOf(id)) || '').trim();
   const firstName = name.split(/\s+/)[0] || 'them';
   const open = knows(id);
 

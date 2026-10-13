@@ -296,6 +296,7 @@ declare
   me uuid := auth.uid();
   other_id uuid;
   other_name text;
+  other_discoverable boolean;
 begin
   if me is null then
     raise exception 'Sign in first';
@@ -304,7 +305,7 @@ begin
     return jsonb_build_object('result', 'need_name');
   end if;
 
-  select p.id, p.display_name into other_id, other_name
+  select p.id, p.display_name, p.discoverable into other_id, other_name, other_discoverable
   from public.profiles p
   where p.friend_code = upper(regexp_replace(code, '[^a-zA-Z0-9]', '', 'g'));
   if other_id is null then
@@ -312,6 +313,12 @@ begin
   end if;
   if other_id = me then
     return jsonb_build_object('result', 'self');
+  end if;
+  -- Same as send_friend_request_to: people who'd rather not be found can only be asked back by someone they asked.
+  if not other_discoverable and not exists (
+    select 1 from public.friendships f where f.requester = other_id and f.addressee = me and f.status = 'pending'
+  ) then
+    return jsonb_build_object('result', 'not_found');
   end if;
 
   return public.request_friendship(me, other_id, other_name);

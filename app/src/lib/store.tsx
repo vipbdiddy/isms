@@ -182,6 +182,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [likes, setLikes] = useState<Like[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+  // Names of people found by search or in contacts, who may not be among `profiles`.
+  const [foundNames, setFoundNames] = useState<ReadonlyMap<string, string>>(new Map());
   const userId = session?.user.id ?? '';
 
   // Settings, example hearts and the sign-in all come from the device first.
@@ -230,7 +232,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           })
         : Promise.resolve(null);
       const [data, friends] = await Promise.all([db.fetchAll(userId || null), friendsLoad]);
-      const withLinks = await withPhotos(data.lovedOnes);
+      // The names of everyone on screen: who shared what you can see, who liked or commented on it,
+      // your friends and requests, and the people in your groups. The database leaves out anyone
+      // whose name you may not see.
+      const people = new Set<string>([
+        ...data.lovedOnes.map((l) => l.ownerId),
+        ...data.likes.map((l) => l.userId),
+        ...data.comments.map((c) => c.authorId),
+        ...(friends?.friendships.map((f) => f.otherId) ?? []),
+        ...(friends?.groupMembers.flatMap((m) => (m.invitedBy ? [m.userId, m.invitedBy] : [m.userId])) ?? []),
+      ]);
+      people.delete(userId);
+      const namesLoad = userId
+        ? db.fetchNames([...people]).catch((e: unknown) => {
+            console.warn('Could not load names', e);
+            return [];
+          })
+        : Promise.resolve([]);
+      const [withLinks, others] = await Promise.all([withPhotos(data.lovedOnes), namesLoad]);
       const waiting = friends?.isAdmin
         ? await db.contentToReview().then(
             (items) => items.length,
@@ -248,9 +267,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setLikes(data.likes);
       setComments(data.comments);
       setLoadError(undefined);
+      setProfiles(others);
       if (friends) {
         setProfile(friends.me);
-        setProfiles(friends.others);
         setFriendships(friends.friendships);
         setGroupList(friends.groups);
         setGroupMembers(friends.groupMembers);
@@ -297,6 +316,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setGroupMembers([]);
     setLikes([]);
     setComments([]);
+    setFoundNames(new Map());
     setFriendsError(undefined);
     setIsAdmin(false);
     setReviewCount(0);
@@ -356,7 +376,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const byId = new Map(allLovedOnes.map((l) => [l.id, l]));
     const names = new Map(profiles.map((p) => [p.id, p.displayName.trim()]));
     if (profile) names.set(profile.id, profile.displayName.trim());
-    const nameOf = (id: string) => names.get(id) ?? '';
+    const nameOf = (id: string) => names.get(id) ?? foundNames.get(id) ?? '';
+    const remember = (found: PersonResult[]) => {
+      if (found.length) setFoundNames((known) => new Map([...known, ...found.map((p): [string, string] => [p.id, p.displayName])]));
+      return found;
+    };
     const knows = (id: string) => knowsSharer(id, circle);
     const groupsById = new Map(groupList.map((g) => [g.id, g]));
     const changedHere = () => {
@@ -537,12 +561,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
       },
 
-      searchPeople: (query) => db.searchPeople(query),
+      searchPeople: (query) => db.searchPeople(query).then(remember),
 
       findFromContacts: async () => {
         requireUser();
         const hashes = await contactEmailHashes();
-        return hashes === null ? null : hashes.length ? db.findPeopleFromContacts(hashes) : [];
+        return hashes === null ? null : hashes.length ? db.findPeopleFromContacts(hashes).then(remember) : [];
       },
 
       sendFriendRequest: async (otherId) => {
@@ -624,6 +648,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     isAdmin,
     reviewCount,
     profiles,
+    foundNames,
     friendships,
     friendsError,
     friendIds,

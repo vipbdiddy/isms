@@ -203,7 +203,8 @@ export async function fetchAll(userId: string | null) {
     supabase.from('isms').select('*').order('created_at', { ascending: false }),
     userId ? supabase.from('saved_isms').select('ism_id') : none,
     userId ? supabase.from('likes').select('user_id, ism_id, loved_one_id').order('created_at', { ascending: false }) : none,
-    userId ? supabase.from('comments').select('*').order('created_at') : none,
+    // Newest first: one request returns at most 1000 rows, so if there are ever more, the oldest are left out.
+    userId ? supabase.from('comments').select('*').order('created_at', { ascending: false }) : none,
   ]);
   if (lovedOnes.error) throw lovedOnes.error;
   if (isms.error) throw isms.error;
@@ -218,7 +219,7 @@ export async function fetchAll(userId: string | null) {
     likes: ((likes.data ?? []) as LikeRow[]).map(
       (r): Like => ({ userId: r.user_id, ismId: orUndefined(r.ism_id), lovedOneId: orUndefined(r.loved_one_id) }),
     ),
-    comments: ((comments.data ?? []) as CommentRow[]).map(toComment),
+    comments: ((comments.data ?? []) as CommentRow[]).map(toComment).reverse(),
   };
 }
 
@@ -264,32 +265,26 @@ export async function setSaved(ismId: string, saved: boolean) {
 }
 
 /**
- * Your own profile, the names of the people you may see, your friends and friend requests, your groups
- * and group invitations, and whether you review shared memories.
+ * Your own profile, your friends and friend requests, your groups and group invitations, and whether
+ * you review shared memories. Other people's names come from fetchNames.
  */
 export async function fetchFriends(userId: string) {
-  const [profiles, friendships, admin, groups, members] = await Promise.all([
-    supabase.from('profiles').select('id, display_name, discoverable, public_profile'),
+  const [mine, friendships, admin, groups, members] = await Promise.all([
+    supabase.from('profiles').select('id, display_name, discoverable, public_profile').eq('id', userId).maybeSingle(),
     supabase.from('friendships').select('requester, addressee, status, created_at').order('created_at', { ascending: false }),
     supabase.rpc('is_admin'),
     supabase.from('groups').select('*').order('name'),
     supabase.from('group_members').select('group_id, user_id, status, invited_by, created_at').order('created_at'),
   ]);
-  if (profiles.error) throw profiles.error;
+  if (mine.error) throw mine.error;
   if (friendships.error) throw friendships.error;
   // Trouble with groups never hides your friends.
   if (groups.error) console.warn('Could not load groups', groups.error);
   if (members.error) console.warn('Could not load group members', members.error);
-  const rows = profiles.data as ProfileRow[];
-  const mine = rows.find((r) => r.id === userId);
+  const me = mine.data as ProfileRow | null;
   return {
-    me: mine
-      ? { id: mine.id, displayName: mine.display_name, discoverable: mine.discoverable, publicProfile: mine.public_profile }
-      : null,
+    me: me ? { id: me.id, displayName: me.display_name, discoverable: me.discoverable, publicProfile: me.public_profile } : null,
     isAdmin: admin.data === true,
-    others: rows
-      .filter((r) => r.id !== userId)
-      .map((r): Profile => ({ id: r.id, displayName: r.display_name, publicProfile: r.public_profile })),
     groups: ((groups.data ?? []) as GroupRow[]).map(
       (r): Group => ({ id: r.id, name: r.name, ownerId: r.owner_id, createdAt: Date.parse(r.created_at) }),
     ),
@@ -311,6 +306,28 @@ export async function fetchFriends(userId: string) {
       }),
     ),
   };
+}
+
+/** How many people to ask about at once, so the request's address stays short. */
+const NAMES_AT_ONCE = 100;
+
+/**
+ * The names of these people, and whether their profile is public: only for those whose names you may
+ * see (the database decides). Asks a few at a time, so it works however many people there are.
+ */
+export async function fetchNames(ids: string[]): Promise<Profile[]> {
+  const unique = [...new Set(ids)];
+  const batches: string[][] = [];
+  for (let i = 0; i < unique.length; i += NAMES_AT_ONCE) batches.push(unique.slice(i, i + NAMES_AT_ONCE));
+  const results = await Promise.all(
+    batches.map((batch) => supabase.from('profiles').select('id, display_name, public_profile').in('id', batch)),
+  );
+  return results.flatMap(({ data, error }) => {
+    if (error) throw error;
+    return (data as Omit<ProfileRow, 'discoverable'>[]).map(
+      (r): Profile => ({ id: r.id, displayName: r.display_name, publicProfile: r.public_profile }),
+    );
+  });
 }
 
 /** People whose name contains `query` (at least 2 letters), if they allow being found. */

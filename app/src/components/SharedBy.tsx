@@ -5,9 +5,8 @@ import { useStore } from '../lib/store';
 import { colors } from '../lib/theme';
 import type { LovedOne } from '../lib/types';
 
-/** Opens someone's profile. `name` is shown while their profile loads, or if it's private (say, found by search). */
-export const openPerson = (id: string, name?: string) =>
-  router.push({ pathname: '/person/[id]', params: name ? { id, name } : { id } });
+/** Opens someone's profile. */
+export const openPerson = (id: string) => router.push({ pathname: '/person/[id]', params: { id } });
 
 /** Opens a group's page. */
 export const openGroup = (id: string) => router.push({ pathname: '/group/[id]', params: { id } });

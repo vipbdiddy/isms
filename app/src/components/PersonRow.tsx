@@ -39,7 +39,7 @@ export function PersonRow({
       {personId ? (
         <Pressable
           style={({ pressed }) => [styles.top, pressed && { opacity: 0.8 }]}
-          onPress={() => openPerson(personId, name)}
+          onPress={() => openPerson(personId)}
           accessibilityRole="link"
           accessibilityHint="Opens their profile">
           {top}

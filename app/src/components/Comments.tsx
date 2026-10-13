@@ -136,7 +136,7 @@ export function CommentComposer({ target }: { target: Target }) {
     } catch (e) {
       console.warn('Could not comment', e);
       setText((typed) => typed || body);
-      const message = e instanceof Error ? e.message : '';
+      const message = String((e as { message?: unknown } | null)?.message ?? '');
       setError(
         /a lot of comments/.test(message)
           ? 'You’ve written a lot of comments. Try again in a little while.'
