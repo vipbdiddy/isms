@@ -1,6 +1,6 @@
 # Ism's Privacy Policy
 
-Last updated: October 12, 2026
+Last updated: October 13, 2026
 
 This policy explains what information Ism's collects, how it is used, and who can see it.
 
@@ -8,10 +8,12 @@ This policy explains what information Ism's collects, how it is used, and who ca
 
 - **Your account.** If you sign in with Google, we receive your name, email address and profile picture from Google. If you sign up with an email address, we store that address and a protected (hashed) version of your password.
 - **What you add about your loved ones.** Their names, relationships, years, short descriptions, obituaries and photos, and the ism's (quotes) and stories you save, along with the topics you tag them with.
-- **Your saved favorites.** Which ism's and stories you have marked with ♥.
-- **Your name and friends.** The name you choose for other people to see (if you sign in with Google, it starts as your Google name), whether people may find you, and who you are friends with or have sent or received friend requests from.
+- **Your saved favorites.** Which ism's and stories you have saved (the bookmark).
+- **Your name and friends.** The name you choose for other people to see (if you sign in with Google, it starts as your Google name), whether people may find you, whether your profile is public, and who you are friends with or have sent or received friend requests from.
+- **Your groups.** The groups you make or join, who is in them, and the invitations you send, receive or decline.
+- **Likes and comments.** What you like, the comments you write, and when.
 - **Your contacts, only if you ask.** If you choose "Find friends from your contacts", the app asks your phone for permission, reads the email addresses in your contacts, and turns each one into a scrambled code (a SHA-256 hash) on your phone. Only those codes are sent, to check which belong to people on Ism's; they are not stored. Your contacts' names, phone numbers and addresses are never read or uploaded. We only keep a count of how many times you checked each day, to stop misuse.
-- **Reports.** If you report something, we keep the report and the reason you picked so a reviewer can look at it.
+- **Reports.** If you report something (a memory or a comment), we keep the report and the reason you picked so a reviewer can look at it.
 - **On your device only.** Your display preferences, and a name you enter before signing in, stay on your phone (or in your browser, on the web version).
 
 ## Who can see it
@@ -22,17 +24,24 @@ For each loved one, you choose who can see their name, relationship, years, desc
 
 - **Just me** (the default): only you.
 - **Friends**: you and the people you have added as friends in Ism's.
+- **A group**: you and the members of one group you choose, like your family.
 - **Everyone**: everyone who uses Ism's, including people who are not signed in.
 
 You can keep individual ism's or stories private, and you can change who can see a loved one at any time, which takes effect right away.
 
-**Your name** is shown to your friends, to people you send a friend request to or receive one from, and to people who search for it or have your email address in their contacts. To stop people finding you, turn off **Settings (⚙) → Let people find me**. People who are not your friends never see which loved ones are yours. Your email address is never shown to other people.
+**Groups.** The members of a group see who else is in it and who has been invited. When you leave a group or are removed from it, the loved ones you shared with it become private again (only you), and when a group is deleted, everything shared with it becomes private again for whoever shared it.
 
-**Keeping shared memories kind.** Shared ism's, stories and loved ones whose words might hurt, accuse or embarrass someone are held until a reviewer at Ism's looks at them, and so is anything three people report. Until then, only you can see them. Reviewers can read what is held or reported so they can decide whether to allow or remove it. They never see anything you keep to yourself.
+**Likes and comments.** Everyone who can see a loved one, ism or story can see who liked it and the comments on it, with the names of the people who wrote them. You can delete your own comments, and you can delete anyone's comments on the loved ones, ism's and stories you shared.
+
+**Your name** is shown to your friends, to the people in your groups, to the members of a group you're invited to, to people you send a friend request to or receive one from, and to people who search for it or have your email address in their contacts. It also shows with your comments and likes, to everyone who can see what you commented on or liked. To stop people finding you by name or email address, turn off **Settings (⚙) → Let people find me**.
+
+**Your profile** lists the loved ones, ism's and stories you share with whoever is looking. Your friends and the people in your groups can open it. People who are not your friends and not in your groups don't see which loved ones are yours, unless you turn on **Settings (⚙) → Public profile**: then anyone signed in who can see something you shared also sees your name on it, and can open your profile. Your email address is never shown to other people.
+
+**Keeping shared memories kind.** Shared ism's, stories, loved ones and comments whose words might hurt, accuse or embarrass someone are held until a reviewer at Ism's looks at them, and so is anything three people report. Until then, only the person who wrote it can see it. Reviewers can read what is held or reported so they can decide whether to allow or remove it. They never see anything you keep to yourself.
 
 ## How we use it
 
-We use this information only to run Ism's: to sign you in, to save what you add, to help you find and connect with friends, to keep shared memories kind, and to show what you add to you (and, for loved ones you choose to share, to your friends or to other people using Ism's). When you add a loved one, the app checks whether someone with the same name and dates or obituary is already shared with you, so it can ask "Is this who you're looking for?". That check only looks at loved ones you can already see. We do not sell your information, and we do not use it for advertising.
+We use this information only to run Ism's: to sign you in, to save what you add, to help you find and connect with friends and groups, to keep shared memories kind, and to show what you add to you (and, for loved ones you choose to share, to your friends, your group or other people using Ism's, along with the likes and comments on them). When you add a loved one, the app checks whether someone with the same name and dates or obituary is already shared with you, so it can ask "Is this who you're looking for?". That check only looks at loved ones you can already see. We do not sell your information, and we do not use it for advertising.
 
 Our use of information received from Google APIs follows the Google API Services User Data Policy, including the Limited Use requirements.
 
@@ -42,7 +51,7 @@ Your information is stored with Supabase, the database, file storage and sign-in
 
 ## Deleting your data
 
-You can delete your account at any time in the app: **Settings (⚙) → Delete my account**. This permanently deletes your account, your name and friend list, your reports, and every loved one, photo, ism and story you added. You can also ask us to delete your account by emailing vipbdiddy@gmail.com.
+You can delete your account at any time in the app: **Settings (⚙) → Delete my account**. This permanently deletes your account, your name and friend list, the groups you made, your likes, comments and reports, and every loved one, photo, ism and story you added. Loved ones other people shared with a group you made become private again for them. You can also ask us to delete your account by emailing vipbdiddy@gmail.com.
 
 ## Changes
 
