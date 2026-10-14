@@ -27,11 +27,11 @@ For each loved one, you choose who can see their name, relationship, years, desc
 - **A group**: you and the members of one group you choose, like your family.
 - **Everyone**: everyone who uses Isms, including people who are not signed in.
 
-You can keep individual isms or stories private, and you can change who can see a loved one at any time, which takes effect right away.
+Their isms and stories are seen by the same people, unless you choose differently for one: just you, your friends, one or more of your groups, or everyone. If you share an ism or story with people who can't see its loved one, they also see the loved one's name, relationship, years and photo with it, but not their description or obituary. You can change who can see a loved one, or any ism or story, at any time, which takes effect right away.
 
-**Adding to someone else's loved one.** Unless the person who added a loved one turns it off, everyone who can see that loved one can add their own isms and stories to them. What you add is seen by everyone who can see the loved one, with your name, and the person who added the loved one can remove it. If they delete the loved one, everything added to them is deleted too.
+**Adding to someone else's loved one.** Unless the person who added a loved one turns it off, everyone who can see that loved one can add their own isms and stories to them. What you add is seen by everyone who can see the loved one, with your name, unless you keep it private; you can't share it with anyone else. The person who added the loved one can remove it. If they delete the loved one, everything added to them is deleted too.
 
-**Groups.** The members of a group see who else is in it and who has been invited. When you leave a group or are removed from it, the loved ones you shared with it become private again (only you), and when a group is deleted, everything shared with it becomes private again for whoever shared it.
+**Groups.** The members of a group see who else is in it and who has been invited. When you leave a group or are removed from it, the loved ones you shared with it become private again (only you), and the isms and stories you shared with it stop being shared with it (if it was their only group, they become private again). When a group is deleted, the same happens to everything shared with it, for whoever shared it.
 
 **Likes and comments.** Everyone who can see a loved one, ism or story can see who liked it and the comments on it, with the names of the people who wrote them. You can delete your own comments, and you can delete anyone's comments on the loved ones, isms and stories you shared.
 
