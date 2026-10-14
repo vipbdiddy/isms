@@ -161,7 +161,7 @@ export function PostSharingPicker({
   groupIds: string[];
   onChange: (visibility: Visibility, groupIds: string[]) => void;
 }) {
-  const { groups } = useStore();
+  const { groups, loaded } = useStore();
   const chosen = groups.filter((g) => groupIds.includes(g.id));
   const same = sameSharingAsLovedOne(lovedOne, visibility, groupIds);
 
@@ -204,7 +204,9 @@ export function PostSharingPicker({
             ))}
           </View>
         ) : (
-          <Text style={styles.muted}>You’re not in any groups yet. Make one from the Friends tab.</Text>
+          <Text style={styles.muted}>
+            {loaded ? 'You’re not in any groups yet. Make one from the Friends tab.' : 'Loading your groups…'}
+          </Text>
         )
       ) : null}
       <Text style={styles.hint}>
