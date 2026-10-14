@@ -48,6 +48,15 @@ create table if not exists public.isms (
 create index if not exists isms_loved_one_idx on public.isms (loved_one_id);
 create index if not exists isms_owner_idx on public.isms (owner_id);
 
+-- Who can see each quote or story: null for the same people as its loved one, or its own sharing, with
+-- the groups it's shared with (see "Sharing each quote or story on its own" below).
+alter table public.isms add column if not exists visibility text;
+alter table public.isms add column if not exists group_ids uuid[] not null default '{}';
+alter table public.isms drop constraint if exists isms_visibility_check;
+alter table public.isms add constraint isms_visibility_check
+  check (visibility is null or visibility in ('private', 'friends', 'group', 'public'));
+create index if not exists isms_group_ids_idx on public.isms using gin (group_ids);
+
 -- Saved (♥) quotes and stories, per person -------------------------------------
 
 create table if not exists public.saved_isms (
@@ -937,7 +946,8 @@ create trigger comments_review_status
 
 -- People can change everything about their own quotes, stories and loved ones except the review status.
 revoke update on public.isms from anon, authenticated;
-grant update (loved_one_id, kind, title, text, context, topics, keep_private) on public.isms to authenticated;
+grant update (loved_one_id, kind, title, text, context, topics, keep_private, visibility, group_ids) on public.isms
+  to authenticated;
 revoke update on public.loved_ones from anon, authenticated;
 grant update (name, relationship, years, about, obituary, photo_path, visibility, group_id, allow_contributions) on public.loved_ones
   to authenticated;
@@ -981,6 +991,165 @@ as $$
   select exists (select 1 from public.admins a where a.user_id = auth.uid());
 $$;
 
+-- Sharing each quote or story on its own ----------------------------------------------------------
+-- A quote or story is seen by the same people as its loved one (visibility null), unless whoever
+-- added the loved one chooses differently for it: just them ('private'), their friends, one or more
+-- of their groups (group_ids), or everyone. People who add to someone else's loved one can keep what
+-- they add private, but can't share it more widely than the loved one. `keep_private` is kept in
+-- step, for older versions of the app.
+
+create or replace function public.tidy_ism_sharing()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  shared_before uuid[] := '{}';
+  loved_one_owner uuid;
+begin
+  if tg_op = 'UPDATE' then
+    shared_before := old.group_ids;
+    -- An older app only knows "keep this one private": it's private, or like its loved one.
+    if new.keep_private is distinct from old.keep_private and new.visibility is not distinct from old.visibility then
+      new.visibility := case when new.keep_private then 'private' end;
+    end if;
+  elsif new.keep_private and new.visibility is null then
+    new.visibility := 'private';
+  end if;
+
+  if new.visibility is distinct from 'group' then
+    new.group_ids := '{}';
+  else
+    new.group_ids := array(select distinct g from unnest(new.group_ids) g where g is not null);
+    -- No group left (it was deleted, or they left it): only they can see it.
+    if cardinality(new.group_ids) = 0 then
+      new.visibility := 'private';
+      new.group_ids := '{}';
+    end if;
+  end if;
+  new.keep_private := new.visibility is not distinct from 'private';
+
+  if new.visibility in ('friends', 'group', 'public') then
+    select l.owner_id into loved_one_owner from public.loved_ones l where l.id = new.loved_one_id;
+    if loved_one_owner is distinct from new.owner_id then
+      raise exception 'Only whoever added a loved one can share their quotes and stories more widely';
+    end if;
+  end if;
+
+  -- Only with groups they're in. (Groups already there aren't checked again, so leaving one tidies up.)
+  if new.visibility = 'group' and exists (
+    select 1 from unnest(new.group_ids) g
+    where not g = any(shared_before)
+      and not exists (
+        select 1 from public.group_members m
+        where m.group_id = g and m.user_id = new.owner_id and m.status = 'member'
+      )
+  ) then
+    raise exception 'You can only share with groups you''re in';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists isms_sharing on public.isms;
+create trigger isms_sharing
+  before insert or update on public.isms
+  for each row execute function public.tidy_ism_sharing();
+
+-- What was kept private with older versions of the app.
+update public.isms set visibility = 'private' where keep_private and visibility is null;
+
+-- A deleted group, or one someone leaves (or is removed from), stops being shared with: quotes and
+-- stories shared with no group left become private (see tidy_ism_sharing).
+create or replace function public.forget_group_in_isms()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_table_name = 'groups' then
+    update public.isms set group_ids = array_remove(group_ids, old.id) where old.id = any(group_ids);
+  elsif old.status = 'member' then
+    update public.isms set group_ids = array_remove(group_ids, old.group_id)
+    where owner_id = old.user_id and old.group_id = any(group_ids);
+  end if;
+  return old;
+end;
+$$;
+
+drop trigger if exists groups_forget_in_isms on public.groups;
+create trigger groups_forget_in_isms
+  after delete on public.groups
+  for each row execute function public.forget_group_in_isms();
+drop trigger if exists group_members_forget_in_isms on public.group_members;
+create trigger group_members_forget_in_isms
+  after delete on public.group_members
+  for each row execute function public.forget_group_in_isms();
+
+-- Whether a quote or story is shared with the signed-in person (or with nobody signed in), apart from
+-- its review and reports: by its own sharing, or else like its loved one. Whoever added the loved one
+-- sees what others add to them. Like is_shared_with_me, it only ever answers about the person asking.
+create or replace function public.ism_shared_with_me(ism_visibility text, ism_groups uuid[], author uuid, loved_one uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.loved_ones l
+    where l.id = loved_one
+      and (
+        l.owner_id = auth.uid()
+        or (
+          l.review_status in ('ok', 'approved')
+          and not exists (select 1 from public.reports r where r.reporter_id = auth.uid() and r.loved_one_id = l.id)
+          and case ism_visibility
+            when 'private' then false
+            when 'public' then true
+            when 'friends' then public.is_my_friend(author)
+            when 'group' then exists (select 1 from unnest(ism_groups) g where public.is_group_member(g))
+            else public.is_shared_with_me(l.visibility, l.owner_id, l.group_id)
+          end
+        )
+      )
+  );
+$$;
+
+-- Loved ones you can't see, some of whose quotes or stories are shared with you: just enough to show
+-- whose they are (name, relationship, years and photo), not the rest of their page.
+create or replace function public.loved_ones_seen_through_memories()
+returns table (id uuid, owner_id uuid, name text, relationship text, years text, photo_path text, created_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select l.id, l.owner_id, l.name, l.relationship, l.years, l.photo_path, l.created_at
+  from public.loved_ones l
+  where l.owner_id is distinct from auth.uid()
+    and l.review_status in ('ok', 'approved')
+    and not public.is_shared_with_me(l.visibility, l.owner_id, l.group_id)
+    and not exists (select 1 from public.reports r where r.reporter_id = auth.uid() and r.loved_one_id = l.id)
+    and exists (
+      select 1 from public.isms i
+      where i.loved_one_id = l.id
+        and i.visibility in ('friends', 'group', 'public')
+        and i.review_status in ('ok', 'approved')
+        and not exists (select 1 from public.reports r where r.reporter_id = auth.uid() and r.ism_id = i.id)
+        and public.ism_shared_with_me(i.visibility, i.group_ids, i.owner_id, i.loved_one_id)
+    );
+$$;
+
+revoke all on function public.tidy_ism_sharing() from public, anon, authenticated;
+revoke all on function public.forget_group_in_isms() from public, anon, authenticated;
+revoke all on function public.ism_shared_with_me(text, uuid[], uuid, uuid) from public;
+revoke all on function public.loved_ones_seen_through_memories() from public;
+grant execute on function public.ism_shared_with_me(text, uuid[], uuid, uuid) to anon, authenticated;
+grant execute on function public.loved_ones_seen_through_memories() to anon, authenticated;
+
 create or replace function public.report_content(target_ism uuid, target_loved_one uuid, why text)
 returns void
 language plpgsql
@@ -1003,9 +1172,9 @@ begin
 
   if target_ism is not null then
     select i.owner_id, i.review_status,
-      not i.keep_private and (l.owner_id = me or public.is_shared_with_me(l.visibility, l.owner_id, l.group_id))
+      not i.keep_private and public.ism_shared_with_me(i.visibility, i.group_ids, i.owner_id, i.loved_one_id)
     into item_owner, current_status, shared_with_me
-    from public.isms i join public.loved_ones l on l.id = i.loved_one_id
+    from public.isms i
     where i.id = target_ism;
   else
     select l.owner_id, l.review_status, public.is_shared_with_me(l.visibility, l.owner_id, l.group_id)
@@ -1065,10 +1234,9 @@ begin
   if on_ism is not null then
     select i.owner_id = me or (
         not i.keep_private and i.review_status in ('ok', 'approved')
-        and (l.owner_id = me or (
-          l.review_status in ('ok', 'approved') and public.is_shared_with_me(l.visibility, l.owner_id, l.group_id))))
+        and public.ism_shared_with_me(i.visibility, i.group_ids, i.owner_id, i.loved_one_id))
     into shared_with_me
-    from public.isms i join public.loved_ones l on l.id = i.loved_one_id
+    from public.isms i
     where i.id = on_ism;
   elsif on_loved_one is not null then
     select l.owner_id = me or (
@@ -1127,8 +1295,8 @@ as $$
     join public.loved_ones l on l.id = i.loved_one_id
     left join public.profiles p on p.id = i.owner_id
     where public.is_admin()
-      and l.visibility <> 'private'
       and not i.keep_private
+      and (l.visibility <> 'private' or i.visibility is not null)
       and (
         i.review_status = 'pending'
         or exists (select 1 from public.reports r where r.ism_id = i.id and r.resolved_at is null)
@@ -1162,8 +1330,8 @@ as $$
     join public.loved_ones l on l.id = coalesce(c.loved_one_id, i.loved_one_id)
     left join public.profiles p on p.id = c.author_id
     where public.is_admin()
-      and l.visibility <> 'private'
       and not coalesce(i.keep_private, false)
+      and (l.visibility <> 'private' or i.visibility is not null)
       and (
         c.review_status = 'pending'
         or exists (select 1 from public.reports r where r.comment_id = c.id and r.resolved_at is null)
@@ -1268,13 +1436,8 @@ create policy "read own or shared isms" on public.isms
       not keep_private
       and review_status in ('ok', 'approved')
       and not exists (select 1 from public.reports r where r.reporter_id = auth.uid() and r.ism_id = isms.id)
-      -- Its loved one must be yours, or shared with you (that rule is checked for this lookup as well):
-      -- what others add to your loved ones shows to you.
-      and exists (
-        select 1 from public.loved_ones l
-        where l.id = isms.loved_one_id
-          and (l.owner_id = auth.uid() or public.is_shared_with_me(l.visibility, l.owner_id, l.group_id))
-      )
+      -- By its own sharing, or else like its loved one; and what others add to your loved ones shows to you.
+      and public.ism_shared_with_me(visibility, group_ids, owner_id, loved_one_id)
     )
   );
 
@@ -1340,6 +1503,7 @@ create policy "read profiles you may see" on public.profiles
       where i.owner_id = profiles.id and l.owner_id <> profiles.id
     )
     or (public_profile and exists (select 1 from public.loved_ones l where l.owner_id = profiles.id))
+    or (public_profile and exists (select 1 from public.isms i where i.owner_id = profiles.id))
   );
 
 -- You can change your own name, whether people can find you and whether your profile is public, and nothing else.
@@ -1469,6 +1633,9 @@ create policy "read own or shared photos" on storage.objects
         where l.photo_path = storage.objects.name
           and l.review_status in ('ok', 'approved')
           and public.is_shared_with_me(l.visibility, l.owner_id, l.group_id)
+      )
+      or exists (
+        select 1 from public.loved_ones_seen_through_memories() s where s.photo_path = storage.objects.name
       )
     )
   );
