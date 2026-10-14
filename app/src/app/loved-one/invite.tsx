@@ -17,13 +17,13 @@ import { cardStyle, colors, radius, space } from '../../lib/theme';
  */
 export default function InviteToRemember() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getLovedOne, getGroup, userId, loading } = useStore();
+  const { getLovedOne, getGroup, userId, loaded } = useStore();
   const [sent, setSent] = useState<'shared' | 'copied'>();
   const [error, setError] = useState<string>();
   const lovedOne = getLovedOne(id);
 
   if (!lovedOne || lovedOne.ownerId !== userId) {
-    return <Empty title={loading ? 'Loading…' : 'We couldn’t find this person.'} />;
+    return <Empty title={loaded ? 'We couldn’t find this person.' : 'Loading…'} />;
   }
 
   const name = lovedOne.name.trim();

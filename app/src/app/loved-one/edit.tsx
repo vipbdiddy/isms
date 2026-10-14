@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { Avatar } from '../../components/Avatar';
 import { sharedWithLabel } from '../../components/LovedOneRow';
 import { SharingPicker } from '../../components/SharingPicker';
-import { Button, DangerButton, ErrorNote, Field, TextButton, styles } from '../../components/ui';
+import { Button, DangerButton, Empty, ErrorNote, Field, TextButton, styles } from '../../components/ui';
 import { canSeeLovedOne } from '../../lib/advice';
 import { findPossibleDuplicates } from '../../lib/duplicates';
 import { pickPhoto, type PickedPhoto } from '../../lib/photos';
@@ -16,10 +16,18 @@ import type { LovedOne, Visibility } from '../../lib/types';
 
 export default function EditLovedOne() {
   // `groupId`: adding someone from a group's page shares them with that group to start with.
-  const { id, groupId: forGroup } = useLocalSearchParams<{ id?: string; groupId?: string }>();
-  const { getLovedOne, addLovedOne, updateLovedOne, deleteLovedOne, userId, lovedOnes, viewer } = useStore();
+  const { id, groupId } = useLocalSearchParams<{ id?: string; groupId?: string }>();
+  const { getLovedOne, userId, loaded } = useStore();
   const existing = id ? getLovedOne(id) : undefined;
-  const editable = !existing || existing.ownerId === userId;
+  // Opened from a link, or after the page reloaded, they may still be loading. The form starts from
+  // what's saved, so it waits for them.
+  if (id && !existing) return <Empty title={loaded ? 'We couldn’t find this person.' : 'Loading…'} />;
+  if (!userId || (existing && existing.ownerId !== userId)) return null;
+  return <LovedOneForm key={existing?.id ?? 'new'} existing={existing} forGroup={groupId} userId={userId} />;
+}
+
+function LovedOneForm({ existing, forGroup, userId }: { existing?: LovedOne; forGroup?: string; userId: string }) {
+  const { addLovedOne, updateLovedOne, deleteLovedOne, lovedOnes, viewer } = useStore();
 
   const [name, setName] = useState(existing?.name ?? '');
   const [relationship, setRelationship] = useState(existing?.relationship ?? '');
@@ -49,8 +57,6 @@ export default function EditLovedOne() {
           ),
     [existing, name, years, obituary, lovedOnes, notThem, viewer],
   );
-
-  if (!editable || !userId) return null;
 
   const photoUri = photo === null ? undefined : (photo?.previewUri ?? existing?.photoUri);
 

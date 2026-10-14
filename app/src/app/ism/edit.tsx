@@ -6,7 +6,7 @@ import { Button, DangerButton, Empty, ErrorNote, Field, Segmented, TopicPicker, 
 import { canContribute, detectTopics } from '../../lib/advice';
 import { useStore } from '../../lib/store';
 import { colors } from '../../lib/theme';
-import type { EntryKind } from '../../lib/types';
+import type { EntryKind, Ism, LovedOne } from '../../lib/types';
 
 const KINDS = [
   ['quote', 'A quote'],
@@ -14,20 +14,10 @@ const KINDS = [
 ] as const;
 
 export default function EditIsm() {
-  const params = useLocalSearchParams<{ lovedOneId: string; id?: string; kind?: EntryKind }>();
-  const { lovedOneId, id } = params;
-  const { getLovedOne, getGroup, isms, addIsm, updateIsm, deleteIsm, userId, viewer } = useStore();
+  const { lovedOneId, id, kind } = useLocalSearchParams<{ lovedOneId: string; id?: string; kind?: EntryKind }>();
+  const { getLovedOne, isms, userId, viewer, loaded } = useStore();
   const lovedOne = getLovedOne(lovedOneId);
   const existing = id ? isms.find((i) => i.id === id) : undefined;
-
-  const [kind, setKind] = useState<EntryKind>(existing?.kind ?? (params.kind === 'story' ? 'story' : 'quote'));
-  const [title, setTitle] = useState(existing?.title ?? '');
-  const [text, setText] = useState(existing?.text ?? '');
-  const [context, setContext] = useState(existing?.context ?? '');
-  const [topics, setTopics] = useState<string[]>(existing?.topics ?? []);
-  const [keepPrivate, setKeepPrivate] = useState(existing?.keepPrivate ?? false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string>();
 
   if (!userId) {
     return (
@@ -36,10 +26,40 @@ export default function EditIsm() {
       </Empty>
     );
   }
-  if (!lovedOne) return <Empty title="We couldn’t find this person." />;
+  // Opened from a link, or after the page reloaded, they may still be loading. The form starts from
+  // what's saved, so it waits for them.
+  if (!lovedOne || (id && !existing)) {
+    return (
+      <Empty title={!loaded ? 'Loading…' : lovedOne ? 'We couldn’t find this memory.' : 'We couldn’t find this person.'} />
+    );
+  }
   if (existing ? existing.ownerId !== userId : !canContribute(lovedOne, viewer)) {
     return <Empty title={`Only whoever added ${lovedOne.name} can add to their page right now.`} />;
   }
+  return <IsmForm key={existing?.id ?? 'new'} lovedOne={lovedOne} existing={existing} startAs={kind} userId={userId} />;
+}
+
+function IsmForm({
+  lovedOne,
+  existing,
+  startAs,
+  userId,
+}: {
+  lovedOne: LovedOne;
+  existing?: Ism;
+  startAs?: EntryKind;
+  userId: string;
+}) {
+  const { getGroup, addIsm, updateIsm, deleteIsm } = useStore();
+  const [kind, setKind] = useState<EntryKind>(existing?.kind ?? (startAs === 'story' ? 'story' : 'quote'));
+  const [title, setTitle] = useState(existing?.title ?? '');
+  const [text, setText] = useState(existing?.text ?? '');
+  const [context, setContext] = useState(existing?.context ?? '');
+  const [topics, setTopics] = useState<string[]>(existing?.topics ?? []);
+  const [keepPrivate, setKeepPrivate] = useState(existing?.keepPrivate ?? false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
+
   // Adding to someone else's loved one.
   const theirs = lovedOne.ownerId !== userId;
 

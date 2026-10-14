@@ -63,6 +63,8 @@ interface Store {
   ready: boolean;
   /** Quotes and stories are being fetched. */
   loading: boolean;
+  /** The first load for whoever is signed in (or nobody) has finished, or failed. */
+  loaded: boolean;
   /** Why the last fetch failed, if it did. */
   loadError?: string;
   session: Session | null;
@@ -170,6 +172,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [savedExamples, setSavedExamples] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -286,7 +289,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       console.warn('Could not load', e);
       setLoadError('Couldn’t load memories. Check your connection and pull down to try again.');
     } finally {
-      if (load === latestLoad.current) setLoading(false);
+      if (load === latestLoad.current) {
+        setLoading(false);
+        setLoaded(true);
+      }
     }
   }, [userId, withPhotos]);
 
@@ -307,6 +313,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     // Don't keep showing the previous account's memories while the new ones load.
+    setLoaded(false);
     setLovedOnes([]);
     setIsms([]);
     setSavedIds([]);
@@ -403,6 +410,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return {
       ready,
       loading,
+      loaded,
       loadError,
       session,
       userId,
@@ -636,6 +644,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [
     ready,
     loading,
+    loaded,
     loadError,
     session,
     userId,

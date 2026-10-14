@@ -52,6 +52,7 @@ export default function PersonScreen() {
     answerFriendRequest,
     removeFriend,
     loading,
+    loaded,
     refresh,
   } = useStore();
   const [shown, setShown] = useState(PAGE);
@@ -84,7 +85,7 @@ export default function PersonScreen() {
     );
   }
   if (!name && !open) {
-    return <Empty title={loading ? 'Loading…' : 'We couldn’t find this person.'} />;
+    return <Empty title={loaded ? 'We couldn’t find this person.' : 'Loading…'} />;
   }
 
   const friendship = friendships.find((f) => f.otherId === id);

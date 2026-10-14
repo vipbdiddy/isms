@@ -44,7 +44,7 @@ const OBITUARY_PREVIEW_LINES = 5;
 
 export default function LovedOneScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getLovedOne, getGroup, isms, userId, viewer, report, commentsOn, loading } = useStore();
+  const { getLovedOne, getGroup, isms, userId, viewer, report, commentsOn, loaded } = useStore();
   const [kind, setKind] = useState<KindFilter>('all');
   const [obituaryOpen, setObituaryOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -60,6 +60,7 @@ export default function LovedOneScreen() {
   }
 
   if (!lovedOne || !canSeeLovedOne(lovedOne, viewer)) {
+    if (!loaded) return <Empty title="Loading…" />;
     // Someone opening a link they were sent: they may only need to sign in.
     if (!userId) {
       return (
@@ -68,7 +69,7 @@ export default function LovedOneScreen() {
         </Empty>
       );
     }
-    return <Empty title={loading ? 'Loading…' : 'We couldn’t find this person. They may not be shared with you.'} />;
+    return <Empty title="We couldn’t find this person. They may not be shared with you." />;
   }
 
   const mine = lovedOne.ownerId === userId;

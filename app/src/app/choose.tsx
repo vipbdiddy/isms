@@ -12,7 +12,7 @@ import { useStore } from '../lib/store';
  */
 export default function Choose() {
   const { for: purpose } = useLocalSearchParams<{ for?: string }>();
-  const { lovedOnes, isms, viewer, userId } = useStore();
+  const { lovedOnes, isms, viewer, userId, loaded } = useStore();
   const inviting = purpose === 'invite';
 
   if (!userId) {
@@ -22,6 +22,8 @@ export default function Choose() {
       </Empty>
     );
   }
+
+  if (!loaded) return <Empty title="Loading…" />;
 
   const mine = lovedOnes.filter((l) => l.ownerId === userId);
   const others = inviting ? [] : lovedOnesToAddTo(lovedOnes, isms, viewer).filter((l) => l.ownerId !== userId);

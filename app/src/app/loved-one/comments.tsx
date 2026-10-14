@@ -14,12 +14,12 @@ import { colors, space } from '../../lib/theme';
 /** Comments on a loved one: kind words and memories for their family. */
 export default function LovedOneComments() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getLovedOne, viewer, loading } = useStore();
+  const { getLovedOne, viewer, loaded } = useStore();
   const insets = useSafeAreaInsets();
   const lovedOne = getLovedOne(id);
 
   if (!lovedOne || !canSeeLovedOne(lovedOne, viewer)) {
-    return <Empty title={loading ? 'Loading…' : 'We couldn’t find this person.'} />;
+    return <Empty title={loaded ? 'We couldn’t find this person.' : 'Loading…'} />;
   }
   const target = { lovedOneId: lovedOne.id };
 
