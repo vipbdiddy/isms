@@ -48,7 +48,7 @@ function CommentRow({ comment, memoryOwnerId }: { comment: Comment; memoryOwnerI
     return (
       <View style={[styles.bubble, { flexDirection: 'row', gap: space.sm, alignItems: 'center' }]}>
         <Ionicons name="checkmark-circle-outline" size={18} color={colors.sage} />
-        <Text style={[ui.body, { flex: 1 }]}>Thanks. It’s hidden for you now, and someone at Ism’s will take a look.</Text>
+        <Text style={[ui.body, { flex: 1 }]}>Thanks. It’s hidden for you now, and someone at Isms will take a look.</Text>
       </View>
     );
   }

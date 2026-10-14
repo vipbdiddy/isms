@@ -45,7 +45,7 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarBadgeStyle: { backgroundColor: colors.accent, color: '#fff' },
       }}>
-      <Tabs.Screen name="index" options={{ title: 'Home', headerTitle: 'Ism’s', tabBarIcon: icon('home-outline', 'home') }} />
+      <Tabs.Screen name="index" options={{ title: 'Home', headerTitle: 'Isms', tabBarIcon: icon('home-outline', 'home') }} />
       <Tabs.Screen
         name="ask"
         options={{

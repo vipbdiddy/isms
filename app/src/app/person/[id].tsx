@@ -198,7 +198,7 @@ export default function PersonScreen() {
           <Text style={styles.body}>
             This is your profile.{' '}
             {profile?.publicProfile
-              ? 'It’s public: anyone on Ism’s can open it, and sees what you share with them.'
+              ? 'It’s public: anyone on Isms can open it, and sees what you share with them.'
               : 'Your friends and the people in your groups can open it, and see what you share with them.'}
           </Text>
           <TextButton title="Change this in Settings" onPress={() => router.push('/settings')} />

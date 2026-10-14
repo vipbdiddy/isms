@@ -93,7 +93,7 @@ function obituaryOverlap(a: Set<string>, b: Set<string>): number {
 }
 
 /**
- * People already in Ism's who look like the one being added: the same name with the same years
+ * People already in Isms who look like the one being added: the same name with the same years
  * or a similar obituary, the same full name, or the same obituary. Different years rule a match out.
  * Best matches first.
  */

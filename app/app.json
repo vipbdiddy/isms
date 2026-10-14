@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Ism's",
+    "name": "Isms",
     "slug": "isms",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -34,7 +34,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Ism's uses your photos so you can add a picture of your loved one.",
+          "photosPermission": "Isms uses your photos so you can add a picture of your loved one.",
           "cameraPermission": false,
           "microphonePermission": false
         }
@@ -53,7 +53,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Ism's checks your contacts' email addresses, only when you ask, to find friends who already use Ism's. Your contacts are never uploaded."
+          "contactsPermission": "Isms checks your contacts' email addresses, only when you ask, to find friends who already use Isms. Your contacts are never uploaded."
         }
       ]
     ],

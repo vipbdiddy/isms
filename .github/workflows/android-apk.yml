@@ -59,7 +59,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-${{ github.run_number }}
-          name: Ism's (Android build ${{ github.run_number }})
+          name: Isms (Android build ${{ github.run_number }})
           body: Install on Android by opening isms.apk on your phone.
           files: app/isms.apk
           make_latest: true
