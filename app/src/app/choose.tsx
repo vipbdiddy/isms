@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 import { ScrollView, Text } from 'react-native';
 
 import { LovedOneRow } from '../components/LovedOneRow';
@@ -15,6 +16,20 @@ export default function Choose() {
   const { lovedOnes, isms, viewer, userId, loaded } = useStore();
   const inviting = purpose === 'invite';
 
+  const mine = lovedOnes.filter((l) => l.ownerId === userId);
+  const others = inviting ? [] : lovedOnesToAddTo(lovedOnes, isms, viewer).filter((l) => l.ownerId !== userId);
+  const pick = (id: string) =>
+    inviting
+      ? router.replace({ pathname: '/loved-one/invite', params: { id } })
+      : router.replace({ pathname: '/ism/edit', params: { lovedOneId: id } });
+  // Tapped on Home before their loved ones had loaded: with only one to choose from, go straight to
+  // them, as Home does.
+  const onlyOne = userId && loaded && mine.length + others.length === 1 ? (mine[0] ?? others[0]).id : undefined;
+  useEffect(() => {
+    if (onlyOne) pick(onlyOne);
+    // `pick` is new on every render; only who it's for matters.
+  }, [onlyOne, inviting]);
+
   if (!userId) {
     return (
       <Empty title="Sign in first.">
@@ -23,14 +38,7 @@ export default function Choose() {
     );
   }
 
-  if (!loaded) return <Empty title="Loading…" />;
-
-  const mine = lovedOnes.filter((l) => l.ownerId === userId);
-  const others = inviting ? [] : lovedOnesToAddTo(lovedOnes, isms, viewer).filter((l) => l.ownerId !== userId);
-  const pick = (id: string) =>
-    inviting
-      ? router.replace({ pathname: '/loved-one/invite', params: { id } })
-      : router.replace({ pathname: '/ism/edit', params: { lovedOneId: id } });
+  if (!loaded || onlyOne) return <Empty title="Loading…" />;
   const countFor = (id: string) =>
     isms.filter((i) => i.lovedOneId === id && canSee(i, lovedOnes.find((l) => l.id === id), viewer)).length;
 
