@@ -143,7 +143,7 @@ interface Store {
   updateSettings: (patch: Partial<Settings>) => void;
   /** People whose name contains `query`, who allow being found. */
   searchPeople: (query: string) => Promise<PersonResult[]>;
-  /** Asks for permission, then finds which of your contacts use Ism's. Null when permission was refused. */
+  /** Asks for permission, then finds which of your contacts use Isms. Null when permission was refused. */
   findFromContacts: () => Promise<PersonResult[] | null>;
   sendFriendRequest: (userId: string) => Promise<FriendRequestResult>;
   answerFriendRequest: (otherId: string, accept: boolean) => Promise<void>;
@@ -232,11 +232,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           })
         : Promise.resolve(null);
       const [data, friends] = await Promise.all([db.fetchAll(userId || null), friendsLoad]);
-      // The names of everyone on screen: who shared what you can see, who liked or commented on it,
+      // The names of everyone on screen: who shared or added what you can see, who liked or commented on it,
       // your friends and requests, and the people in your groups. The database leaves out anyone
       // whose name you may not see.
       const people = new Set<string>([
         ...data.lovedOnes.map((l) => l.ownerId),
+        ...data.isms.map((i) => i.ownerId),
         ...data.likes.map((l) => l.userId),
         ...data.comments.map((c) => c.authorId),
         ...(friends?.friendships.map((f) => f.otherId) ?? []),

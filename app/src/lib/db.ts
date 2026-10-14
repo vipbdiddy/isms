@@ -32,6 +32,7 @@ interface LovedOneRow {
   photo_path: string | null;
   visibility: Visibility;
   group_id: string | null;
+  allow_contributions: boolean;
   review_status: ReviewStatus;
   created_at: string;
 }
@@ -131,6 +132,7 @@ const toLovedOne = (r: LovedOneRow): LovedOne => ({
   photoPath: orUndefined(r.photo_path),
   visibility: r.visibility,
   groupId: orUndefined(r.group_id),
+  allowContributions: r.allow_contributions !== false,
   reviewStatus: r.review_status,
   createdAt: Date.parse(r.created_at),
 });
@@ -175,6 +177,7 @@ const lovedOneColumns = (input: Partial<LovedOneInput> & { photoPath?: string | 
   if ('obituary' in input) row.obituary = input.obituary ?? null;
   if ('visibility' in input) row.visibility = input.visibility;
   if ('groupId' in input) row.group_id = input.groupId ?? null;
+  if ('allowContributions' in input) row.allow_contributions = input.allowContributions !== false;
   if ('photoPath' in input) row.photo_path = input.photoPath ?? null;
   return row;
 };

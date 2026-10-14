@@ -23,18 +23,20 @@ export const openIsm = (id: string) => router.push({ pathname: '/ism/[id]', para
 
 /**
  * A quote or story. `showTime` adds when it was shared, for the feed; `showAuthor` false hides whose it
- * is, on that person's own page. `inPost` is for its own page: the whole story, and no comment button
- * (the comments are right below).
+ * is, on that person's own page, where `showCredit` still says who added it. `inPost` is for its own
+ * page: the whole story, and no comment button (the comments are right below).
  */
 export function IsmCard({
   ism,
   showAuthor = true,
   showTime = false,
+  showCredit = false,
   inPost = false,
 }: {
   ism: Ism;
   showAuthor?: boolean;
   showTime?: boolean;
+  showCredit?: boolean;
   inPost?: boolean;
 }) {
   const { getLovedOne, savedIsmIds, toggleSaved, userId, report } = useStore();
@@ -56,7 +58,7 @@ export function IsmCard({
       <View style={[styles.card, styles.reported]}>
         <Ionicons name="checkmark-circle-outline" size={20} color={colors.sage} />
         <Text style={styles.reportedText}>
-          Thanks for letting us know. It’s hidden for you now, and someone at Ism’s will take a look.
+          Thanks for letting us know. It’s hidden for you now, and someone at Isms will take a look.
         </Text>
       </View>
     );
@@ -95,11 +97,17 @@ export function IsmCard({
               {lovedOne.name}
             </Text>
           ) : null}
-          {lovedOne && (showAuthor || showTime) ? (
+          {lovedOne && (showAuthor || showTime || showCredit) ? (
             example ? (
               <Text style={styles.credit}>An example</Text>
             ) : (
-              <SharedBy lovedOne={lovedOne} own={when ? 'Added by you' : undefined} after={when} style={styles.credit} />
+              <SharedBy
+                lovedOne={lovedOne}
+                authorId={ism.ownerId}
+                own={when || showCredit ? 'Added by you' : undefined}
+                after={when}
+                style={styles.credit}
+              />
             )
           ) : null}
           {ism.topics.length > 0 ? <Text style={styles.topics}>{ism.topics.map(topicLabel).join(' · ')}</Text> : null}

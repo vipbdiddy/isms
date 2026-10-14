@@ -31,6 +31,28 @@ export function canSeeLovedOne(lovedOne: LovedOne, viewer: Viewer): boolean {
   return sharedWithMyGroup(lovedOne, viewer);
 }
 
+/**
+ * Whether someone may add quotes and stories to a loved one: always to their own; to someone else's
+ * when they can see them and the owner lets others add memories. Never to the built-in examples.
+ */
+export function canContribute(lovedOne: LovedOne, viewer: Viewer): boolean {
+  if (!viewer.userId || lovedOne.id.startsWith('seed-')) return false;
+  if (lovedOne.ownerId === viewer.userId) return true;
+  return lovedOne.allowContributions !== false && canSeeLovedOne(lovedOne, viewer);
+}
+
+/**
+ * The loved ones someone would pick to add a story or quote to: their own, and others' they may add to
+ * that were shared with their friends or groups, or that they've added to before. Not everyone shared
+ * with everyone; they add to those from their page, through the link they were sent.
+ */
+export function lovedOnesToAddTo(lovedOnes: LovedOne[], isms: Ism[], viewer: Viewer): LovedOne[] {
+  const addedTo = new Set(isms.filter((i) => i.ownerId === viewer.userId).map((i) => i.lovedOneId));
+  return lovedOnes.filter(
+    (l) => canContribute(l, viewer) && (inScope(l, viewer, 'friends') || addedTo.has(l.id)),
+  );
+}
+
 /** Whether someone may see an ism: always their own; otherwise only if its loved one is shared with them. */
 export function canSee(ism: Ism, lovedOne: LovedOne | undefined, viewer: Viewer): boolean {
   if (ism.ownerId === viewer.userId) return true;

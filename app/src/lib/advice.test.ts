@@ -2,7 +2,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { canSee, canSeeLovedOne, detectTopics, feed, findAdvice, matchesKind, visibleIsms, type Viewer } from './advice.ts';
+import {
+  canContribute,
+  canSee,
+  canSeeLovedOne,
+  detectTopics,
+  feed,
+  findAdvice,
+  lovedOnesToAddTo,
+  matchesKind,
+  visibleIsms,
+  type Viewer,
+} from './advice.ts';
 import type { Ism, LovedOne } from './types.ts';
 
 const ME = 'me';
@@ -179,4 +190,32 @@ test('filters quotes, stories, or both', () => {
 test("a story's title counts when matching a situation", () => {
   const story = ism('s', 'mine', ME, [], 'We drove all night.', { kind: 'story', title: 'Fishing at the lake' });
   assert.deepEqual(findAdvice('thinking about fishing', [], [story], ME).map((m) => m.ism.id), ['s']);
+});
+
+test('people who can see a loved one can add memories, unless the owner says no', () => {
+  const grandpa = lovedOne('grandpa', 'other', 'public');
+  const friendsOnly = byId('friendsOnly')!;
+  assert.equal(canContribute(byId('mine')!, me), true);
+  assert.equal(canContribute(grandpa, me), true);
+  assert.equal(canContribute(friendsOnly, me), true);
+  assert.equal(canContribute(friendsOnly, stranger), false);
+  assert.equal(canContribute(byId('theirsPrivate')!, me), false);
+  assert.equal(canContribute({ ...grandpa, allowContributions: false }, me), false);
+  assert.equal(canContribute({ ...byId('mine')!, allowContributions: false }, me), true);
+  assert.equal(canContribute(grandpa, signedOut), false);
+  assert.equal(canContribute({ ...grandpa, id: 'seed-grandpa' }, me), false);
+});
+
+test("the loved ones to pick from when adding a memory: yours, your friends' and groups', and ones you added to", () => {
+  const family = lovedOne('family', COUSIN, 'group', 0, FAMILY);
+  const strangers = lovedOne('strangers', 'other', 'public');
+  const addedTo = lovedOne('addedTo', 'other', 'public');
+  const closed = { ...lovedOne('closed', FRIEND, 'friends'), allowContributions: false };
+  const all = [...lovedOnes, family, strangers, addedTo, closed, lovedOne('seed-mae', 'community', 'public')];
+  const mine = [ism('a', 'addedTo', ME, []), ism('b', 'strangers', 'other', [])];
+  assert.deepEqual(
+    lovedOnesToAddTo(all, mine, me).map((l) => l.id),
+    ['mine', 'friendsOnly', 'family', 'addedTo'],
+  );
+  assert.deepEqual(lovedOnesToAddTo(all, mine, signedOut), []);
 });

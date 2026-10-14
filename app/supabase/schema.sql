@@ -1,4 +1,4 @@
--- Ism's database. Paste this whole file into Supabase → SQL Editor → New query, and press Run.
+-- Isms database. Paste this whole file into Supabase → SQL Editor → New query, and press Run.
 -- It is safe to run again: it only creates what doesn't exist yet and replaces the rules and functions.
 
 -- Loved ones -----------------------------------------------------------------
@@ -25,6 +25,10 @@ alter table public.loved_ones add constraint loved_ones_visibility_check
 
 create index if not exists loved_ones_owner_idx on public.loved_ones (owner_id);
 create index if not exists loved_ones_public_idx on public.loved_ones (visibility) where visibility = 'public';
+
+-- Whether the people who can see a loved one may add their own quotes and stories to them. Whoever
+-- added the loved one can turn this off, and can always remove what others added.
+alter table public.loved_ones add column if not exists allow_contributions boolean not null default true;
 
 -- Quotes and stories -----------------------------------------------------------
 
@@ -382,7 +386,7 @@ create table if not exists public.contact_lookups (
   primary key (user_id, day)
 );
 
--- Which of your contacts use Ism's. The app sends the SHA-256 of each contact's lower-case email
+-- Which of your contacts use Isms. The app sends the SHA-256 of each contact's lower-case email
 -- address, never the addresses themselves, and nothing sent is kept.
 create or replace function public.find_people_from_contacts(email_hashes text[])
 returns table (id uuid, display_name text, mutual_friends int, relationship text)
@@ -818,7 +822,7 @@ revoke insert, update on public.comments from anon, authenticated;
 grant insert (ism_id, loved_one_id, body) on public.comments to authenticated;
 
 -- Kindness review --------------------------------------------------------------------
--- Shared memories that might hurt, accuse or embarrass someone wait for a reviewer at Ism's
+-- Shared memories that might hurt, accuse or embarrass someone wait for a reviewer at Isms
 -- before anyone else can see them, and so does anything three people report. Memories nobody
 -- else can see are never looked at.
 --
@@ -935,7 +939,7 @@ create trigger comments_review_status
 revoke update on public.isms from anon, authenticated;
 grant update (loved_one_id, kind, title, text, context, topics, keep_private) on public.isms to authenticated;
 revoke update on public.loved_ones from anon, authenticated;
-grant update (name, relationship, years, about, obituary, photo_path, visibility, group_id) on public.loved_ones
+grant update (name, relationship, years, about, obituary, photo_path, visibility, group_id, allow_contributions) on public.loved_ones
   to authenticated;
 
 -- Reports: anyone who can see a shared quote, story, loved one or comment can report it. It's hidden
@@ -1271,12 +1275,18 @@ create policy "read own or shared isms" on public.isms
     )
   );
 
+-- Add quotes and stories to your own loved ones, or to someone else's that you can see (the loved ones
+-- rule is checked for this lookup too) when they let others add memories.
 drop policy if exists "add isms to own loved ones" on public.isms;
-create policy "add isms to own loved ones" on public.isms
+drop policy if exists "add isms to loved ones you may add to" on public.isms;
+create policy "add isms to loved ones you may add to" on public.isms
   for insert to authenticated
   with check (
     owner_id = auth.uid()
-    and exists (select 1 from public.loved_ones l where l.id = loved_one_id and l.owner_id = auth.uid())
+    and exists (
+      select 1 from public.loved_ones l
+      where l.id = loved_one_id and (l.owner_id = auth.uid() or l.allow_contributions)
+    )
   );
 
 drop policy if exists "change own isms" on public.isms;
@@ -1285,13 +1295,21 @@ create policy "change own isms" on public.isms
   using (owner_id = auth.uid())
   with check (
     owner_id = auth.uid()
-    and exists (select 1 from public.loved_ones l where l.id = loved_one_id and l.owner_id = auth.uid())
+    and exists (
+      select 1 from public.loved_ones l
+      where l.id = loved_one_id and (l.owner_id = auth.uid() or l.allow_contributions)
+    )
   );
 
+-- Remove your own quotes and stories, and anything others added to your loved ones.
 drop policy if exists "remove own isms" on public.isms;
-create policy "remove own isms" on public.isms
+drop policy if exists "remove own isms or ones added to own loved ones" on public.isms;
+create policy "remove own isms or ones added to own loved ones" on public.isms
   for delete to authenticated
-  using (owner_id = auth.uid());
+  using (
+    owner_id = auth.uid()
+    or exists (select 1 from public.loved_ones l where l.id = isms.loved_one_id and l.owner_id = auth.uid())
+  );
 
 drop policy if exists "manage own saved" on public.saved_isms;
 create policy "manage own saved" on public.saved_isms
@@ -1300,8 +1318,9 @@ create policy "manage own saved" on public.saved_isms
   with check (user_id = auth.uid());
 
 -- You can see your own profile, and the names of: people you're friends with or have a request open
--- with; people in your groups; anyone whose comments or likes you can see (their name shows with
--- them); and people with a public profile, once something of theirs is shared with you.
+-- with; people in your groups; anyone whose comments or likes you can see, or quotes and stories they
+-- added to someone else's loved one (their name shows with them); and people with a public profile,
+-- once something of theirs is shared with you.
 -- Finding other people goes through search_people and find_people_from_contacts instead.
 drop policy if exists "read own and connected profiles" on public.profiles;
 drop policy if exists "read profiles you may see" on public.profiles;
@@ -1313,6 +1332,10 @@ create policy "read profiles you may see" on public.profiles
     or public.shares_a_group_with_me(id)
     or exists (select 1 from public.comments c where c.author_id = profiles.id)
     or exists (select 1 from public.likes k where k.user_id = profiles.id)
+    or exists (
+      select 1 from public.isms i join public.loved_ones l on l.id = i.loved_one_id
+      where i.owner_id = profiles.id and l.owner_id <> profiles.id
+    )
     or (public_profile and exists (select 1 from public.loved_ones l where l.owner_id = profiles.id))
   );
 
@@ -1408,13 +1431,18 @@ create policy "comment on what you can see" on public.comments
     )
   );
 
--- Delete your own comments, or anyone's on the loved ones, quotes and stories you added.
+-- Delete your own comments, or anyone's on the loved ones, quotes and stories you added, including on
+-- quotes and stories others added to your loved ones.
 drop policy if exists "remove own comments or comments on own memories" on public.comments;
 create policy "remove own comments or comments on own memories" on public.comments
   for delete to authenticated
   using (
     author_id = auth.uid()
     or exists (select 1 from public.isms i where i.id = comments.ism_id and i.owner_id = auth.uid())
+    or exists (
+      select 1 from public.isms i join public.loved_ones l on l.id = i.loved_one_id
+      where i.id = comments.ism_id and l.owner_id = auth.uid()
+    )
     or exists (select 1 from public.loved_ones l where l.id = comments.loved_one_id and l.owner_id = auth.uid())
   );
 
