@@ -18,17 +18,24 @@ export function sharedWithMyGroup(lovedOne: Pick<LovedOne, 'visibility' | 'group
   return lovedOne.visibility === 'group' && !!lovedOne.groupId && viewer.groupIds.has(lovedOne.groupId);
 }
 
+/** Whether a loved one's own sharing includes the viewer: everyone, the owner's friends, or the viewer's group. */
+function lovedOneSharedWith(lovedOne: LovedOne, viewer: Viewer): boolean {
+  if (lovedOne.limited) return false;
+  if (lovedOne.visibility === 'public') return true;
+  if (lovedOne.visibility === 'friends') return viewer.friendIds.has(lovedOne.ownerId);
+  return sharedWithMyGroup(lovedOne, viewer);
+}
+
 /**
  * Whether someone may see a loved one: always their own; otherwise only if the family shared them
- * with everyone, with their friends and the viewer is one, or with a group the viewer is in.
- * Mirrors the rules in supabase/schema.sql.
+ * with everyone, with their friends and the viewer is one, or with a group the viewer is in, or (just
+ * whose they are) through a quote or story shared with the viewer. Mirrors the rules in supabase/schema.sql.
  */
 export function canSeeLovedOne(lovedOne: LovedOne, viewer: Viewer): boolean {
   if (lovedOne.ownerId === viewer.userId) return true;
   if (!passedReview(lovedOne)) return false;
-  if (lovedOne.visibility === 'public') return true;
-  if (lovedOne.visibility === 'friends') return viewer.friendIds.has(lovedOne.ownerId);
-  return sharedWithMyGroup(lovedOne, viewer);
+  // The database only sends these when one of their quotes or stories is shared with the viewer.
+  return !!lovedOne.limited || lovedOneSharedWith(lovedOne, viewer);
 }
 
 /**
@@ -36,7 +43,7 @@ export function canSeeLovedOne(lovedOne: LovedOne, viewer: Viewer): boolean {
  * when they can see them and the owner lets others add memories. Never to the built-in examples.
  */
 export function canContribute(lovedOne: LovedOne, viewer: Viewer): boolean {
-  if (!viewer.userId || lovedOne.id.startsWith('seed-')) return false;
+  if (!viewer.userId || lovedOne.id.startsWith('seed-') || lovedOne.limited) return false;
   if (lovedOne.ownerId === viewer.userId) return true;
   return lovedOne.allowContributions !== false && canSeeLovedOne(lovedOne, viewer);
 }
@@ -53,14 +60,45 @@ export function lovedOnesToAddTo(lovedOnes: LovedOne[], isms: Ism[], viewer: Vie
   );
 }
 
-/** Whether someone may see an ism: always their own; otherwise only if its loved one is shared with them. */
+/**
+ * Whether a quote or story is shared with the viewer: by its own sharing (just its author, their friends,
+ * some groups, or everyone), or else like its loved one.
+ */
+function ismSharedWith(ism: Ism, lovedOne: LovedOne, viewer: Viewer): boolean {
+  switch (ism.visibility) {
+    case 'private':
+      return false;
+    case 'public':
+      return true;
+    case 'friends':
+      return viewer.friendIds.has(ism.ownerId);
+    case 'group':
+      return (ism.groupIds ?? []).some((g) => viewer.groupIds.has(g));
+    default:
+      return lovedOneSharedWith(lovedOne, viewer);
+  }
+}
+
+/**
+ * Whether someone may see an ism: always their own; whoever added its loved one sees what others add to
+ * them; otherwise when it's shared with them. Mirrors the rules in supabase/schema.sql.
+ */
 export function canSee(ism: Ism, lovedOne: LovedOne | undefined, viewer: Viewer): boolean {
   if (ism.ownerId === viewer.userId) return true;
-  return !!lovedOne && !ism.keepPrivate && passedReview(ism) && canSeeLovedOne(lovedOne, viewer);
+  if (!lovedOne || ism.keepPrivate || !passedReview(ism)) return false;
+  if (lovedOne.ownerId === viewer.userId) return true;
+  return passedReview(lovedOne) && ismSharedWith(ism, lovedOne, viewer);
+}
+
+/** Whether a quote or story's sharing is the same as its loved one's, so it can just follow theirs. */
+export function sameSharingAsLovedOne(lovedOne: LovedOne, visibility: Ism['visibility'], groupIds: readonly string[]): boolean {
+  if (visibility !== lovedOne.visibility) return false;
+  return visibility !== 'group' || (groupIds.length === 1 && groupIds[0] === lovedOne.groupId);
 }
 
 /** Whether anyone besides its owner could see this, if it passed review. */
 export function isShared(ism: Ism | undefined, lovedOne: LovedOne): boolean {
+  if (ism?.visibility) return ism.visibility !== 'private';
   return lovedOne.visibility !== 'private' && !ism?.keepPrivate;
 }
 
@@ -73,11 +111,24 @@ export function inScope(lovedOne: LovedOne, viewer: Viewer, scope: Scope): boole
   return scope === 'friends' && (viewer.friendIds.has(lovedOne.ownerId) || sharedWithMyGroup(lovedOne, viewer));
 }
 
+/**
+ * Whether a quote or story belongs in a scope: "mine" has your loved ones'; "friends" adds what your
+ * friends add or are remembering, and what's shared with your groups; "everyone" has the rest.
+ */
+export function ismInScope(ism: Ism, lovedOne: LovedOne, viewer: Viewer, scope: Scope): boolean {
+  if (scope === 'everyone' || lovedOne.ownerId === viewer.userId) return true;
+  if (scope === 'mine') return false;
+  if (viewer.friendIds.has(lovedOne.ownerId) || viewer.friendIds.has(ism.ownerId)) return true;
+  if (ism.visibility === 'group') return (ism.groupIds ?? []).some((g) => viewer.groupIds.has(g));
+  return !ism.visibility && sharedWithMyGroup(lovedOne, viewer);
+}
+
 export function visibleIsms(isms: Ism[], lovedOnes: LovedOne[], viewer: Viewer, scope: Scope): Ism[] {
   const byId = new Map(lovedOnes.map((l) => [l.id, l]));
   return isms.filter((ism) => {
     const lovedOne = byId.get(ism.lovedOneId);
-    return canSee(ism, lovedOne, viewer) && (lovedOne ? inScope(lovedOne, viewer, scope) : ism.ownerId === viewer.userId);
+    if (!lovedOne) return ism.ownerId === viewer.userId;
+    return canSee(ism, lovedOne, viewer) && ismInScope(ism, lovedOne, viewer, scope);
   });
 }
 
@@ -88,8 +139,9 @@ export type FeedItem =
 
 /** Everything in a scope that the viewer may see, newest first. */
 export function feed(isms: Ism[], lovedOnes: LovedOne[], viewer: Viewer, scope: Scope): FeedItem[] {
+  // Loved ones seen only through a quote or story come with it, not on their own.
   const people: FeedItem[] = lovedOnes
-    .filter((l) => canSeeLovedOne(l, viewer) && inScope(l, viewer, scope))
+    .filter((l) => !l.limited && canSeeLovedOne(l, viewer) && inScope(l, viewer, scope))
     .map((l) => ({ type: 'lovedOne', id: `loved-one-${l.id}`, at: l.createdAt, lovedOne: l }));
   const memories: FeedItem[] = visibleIsms(isms, lovedOnes, viewer, scope).map((ism) => ({
     type: 'ism',

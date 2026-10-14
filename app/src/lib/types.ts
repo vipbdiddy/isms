@@ -38,6 +38,12 @@ export interface LovedOne {
   /** Missing for the bundled examples, which are always fine. */
   reviewStatus?: ReviewStatus;
   createdAt: number;
+  /**
+   * Seen only through quotes and stories shared with you, not shared with you themselves: just whose
+   * they are (name, relationship, years and photo). You can't see the rest of their page, add to it, or
+   * comment on it.
+   */
+  limited?: boolean;
 }
 
 /** A short saying in their words, or a longer story about them. */
@@ -58,8 +64,15 @@ export interface Ism {
   /** Quotes only: when or why they'd say it. */
   context?: string;
   topics: string[];
-  /** Keeps a single ism private even when the loved one is shared. */
+  /** Only whoever added it can see it ('private' sharing); what older versions of the app know. */
   keepPrivate?: boolean;
+  /**
+   * Who can see it, when that's not the same people as its loved one (missing means the same): just
+   * whoever added it, their friends, the groups in `groupIds`, or everyone.
+   */
+  visibility?: Visibility;
+  /** The groups it's shared with, when `visibility` is 'group'. */
+  groupIds?: string[];
   reviewStatus?: ReviewStatus;
   createdAt: number;
 }

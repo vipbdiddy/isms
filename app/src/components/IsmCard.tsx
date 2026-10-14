@@ -105,6 +105,7 @@ export function IsmCard({
               <SharedBy
                 lovedOne={lovedOne}
                 authorId={ism.ownerId}
+                groupIds={ism.visibility ? (ism.groupIds ?? []) : undefined}
                 own={when || showCredit ? 'Added by you' : undefined}
                 after={when}
                 style={styles.credit}
