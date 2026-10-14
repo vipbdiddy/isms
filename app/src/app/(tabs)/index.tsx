@@ -33,11 +33,15 @@ const HALO_ASPECT = 612 / 380;
 const SWOOSH = require('../../../assets/logo-swoosh.png');
 const SWOOSH_ASPECT = 1212 / 212;
 
-/** Why Isms exists, in its maker's words. */
+/** Why Isms exists, in its maker's words, and an invitation to do the same. */
 const ORIGIN_STORY =
-  'Isms started after my friend Bryce died unexpectedly and left behind seven young kids. I built it so they ' +
-  'could still hear his voice — through the stories and advice people who knew him share. When they’re older ' +
-  'and facing something hard, they can look up what their dad would have said.';
+  'Isms was born after my friend Bryce passed away unexpectedly, leaving behind seven young children. I built ' +
+  'this app so they would never lose his voice. Through the shared stories and advice of the people who knew him, ' +
+  'his kids will always be able to look up exactly what their dad would have said when they face life’s hardest ' +
+  'moments.';
+const INVITATION =
+  'Now, you can do the same. Create a profile, honor your own loved ones, and share their wisdom so their legacy ' +
+  'can continue to guide and help others.';
 
 /**
  * Home, top to bottom: why Isms exists, what you can do, whose wisdom you're looking for (Ask and the
@@ -121,6 +125,7 @@ export default function Home() {
           “
         </Text>
         <Text style={local.storyText}>{ORIGIN_STORY}</Text>
+        <Text style={[local.storyText, local.storyInvite]}>{INVITATION}</Text>
         <Image source={SWOOSH} style={local.storySwoosh} resizeMode="contain" aria-hidden />
         <Pressable
           onPress={() => openWebPage(DONATE_URL)}
@@ -274,6 +279,7 @@ const local = StyleSheet.create({
     color: colors.gold,
   },
   storyText: { fontSize: 17, lineHeight: 27, color: '#FFFFFF' },
+  storyInvite: { color: colors.goldLight, fontWeight: '600' },
   storySwoosh: { width: 190, height: 190 / SWOOSH_ASPECT, marginTop: -space.xs },
   donate: {
     flexDirection: 'row',

@@ -13,7 +13,8 @@ description: A place to save and remember isms from friends and family who have 
   <img class="why-emblem" src="assets/logo-halo-dot.png" alt="">
   <h2 class="why-label" id="why-isms">Why Isms</h2>
   <div class="why-mark" aria-hidden="true">“</div>
-  <p>Isms started after my friend Bryce died unexpectedly and left behind seven young kids. I built it so they could still hear his voice — through the stories and advice people who knew him share. When they’re older and facing something hard, they can look up what their dad would have said.</p>
+  <p>Isms was born after my friend Bryce passed away unexpectedly, leaving behind seven young children. I built this app so they would never lose his voice. Through the shared stories and advice of the people who knew him, his kids will always be able to look up exactly what their dad would have said when they face life’s hardest moments.</p>
+  <p class="why-invite">Now, you can do the same. Create a profile, honor your own loved ones, and share their wisdom so their legacy can continue to guide and help others.</p>
   <img class="why-swoosh" src="assets/logo-swoosh.png" alt="">
 </section>
 
