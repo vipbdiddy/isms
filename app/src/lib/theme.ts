@@ -13,6 +13,12 @@ export const colors = {
   dangerSoft: '#FBECEA',
   /** A liked heart. */
   heart: '#D9615B',
+  /** The logo's gold, for flourishes; text on deep teal uses the lighter gold. */
+  gold: '#CCA95B',
+  goldLight: '#F0DBA5',
+  /** The logo's teal, and a deeper one for a feature card with white text on it. */
+  logoTeal: '#008F7A',
+  deep: '#0A5C52',
 };
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };

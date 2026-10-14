@@ -12,7 +12,7 @@ import { Avatar } from './Avatar';
 import { NameField } from './NameField';
 import { ReportPanel, ReviewNote } from './ReportPanel';
 import { openPerson } from './SharedBy';
-import { Button, ErrorNote, TextButton, styles as ui } from './ui';
+import { Button, ErrorNote, MAX_CONTENT_WIDTH, TextButton, styles as ui } from './ui';
 
 /** The longest comment the database accepts. */
 const MAX_COMMENT = 1000;
@@ -192,6 +192,10 @@ const styles = StyleSheet.create({
   author: { fontWeight: '700', color: colors.ink },
   actions: { flexDirection: 'row', gap: space.lg, alignItems: 'center', paddingLeft: space.sm },
   composer: {
+    // In line with the comments above it, on wide screens too.
+    width: '100%',
+    maxWidth: MAX_CONTENT_WIDTH - 2 * space.lg,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: space.sm,

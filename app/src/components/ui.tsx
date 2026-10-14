@@ -243,9 +243,19 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
   );
 }
 
+/** On wide screens (computers, tablets), screens keep to a centred column this wide. */
+export const MAX_CONTENT_WIDTH = 720;
+
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: space.lg, gap: space.md, paddingBottom: 48 },
+  content: {
+    padding: space.lg,
+    gap: space.md,
+    paddingBottom: 48,
+    width: '100%',
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: 'center',
+  },
   heading: { fontSize: 24, fontWeight: '700', color: colors.ink, letterSpacing: -0.3 },
   subheading: {
     fontSize: 12,
@@ -306,7 +316,7 @@ export const styles = StyleSheet.create({
   },
   inputMultiline: { minHeight: 90, textAlignVertical: 'top' },
   hint: { fontSize: 12, color: colors.muted, lineHeight: 17 },
-  empty: { padding: space.xl, alignItems: 'center', gap: space.md },
+  empty: { padding: space.xl, alignItems: 'center', gap: space.md, width: '100%', maxWidth: 560, alignSelf: 'center' },
   error: { fontSize: 14, color: colors.danger, lineHeight: 20 },
   confirmBox: { ...cardStyle, gap: space.md, padding: space.lg, borderColor: colors.danger },
   emptyTitle: { fontSize: 16, color: colors.muted, textAlign: 'center', lineHeight: 22 },

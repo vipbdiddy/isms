@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { IsmCard } from '../../components/IsmCard';
 import { LovedOneRow } from '../../components/LovedOneRow';
@@ -25,6 +25,13 @@ const FEED_TITLES: Record<Scope, string> = {
   friends: 'Latest from you, your friends and your groups',
   everyone: 'Latest from everyone',
 };
+
+// The logo's halo (over a dot, as over its "i") and swoosh, as flourishes on the "Why Isms" card.
+// Aspect: width over height.
+const HALO = require('../../../assets/logo-halo-dot.png');
+const HALO_ASPECT = 612 / 380;
+const SWOOSH = require('../../../assets/logo-swoosh.png');
+const SWOOSH_ASPECT = 1212 / 212;
 
 /** Why Isms exists, in its maker's words. */
 const ORIGIN_STORY =
@@ -101,15 +108,27 @@ export default function Home() {
       ) : null}
 
       <View style={local.story}>
-        <Text style={local.storyHeading}>Why Isms</Text>
+        {/* Flourishes from the logo: a soft glow with its halo, and its swoosh under the story. */}
+        <View style={local.storyGlow} aria-hidden />
+        <Image source={HALO} style={local.storyHalo} resizeMode="contain" aria-hidden />
+        <View style={local.storyLabelRow}>
+          <Text style={local.storyLabel} accessibilityRole="header">
+            Why Isms
+          </Text>
+          <View style={local.storyLabelRule} />
+        </View>
+        <Text style={local.storyQuoteMark} aria-hidden>
+          “
+        </Text>
         <Text style={local.storyText}>{ORIGIN_STORY}</Text>
+        <Image source={SWOOSH} style={local.storySwoosh} resizeMode="contain" aria-hidden />
         <Pressable
           onPress={() => openWebPage(DONATE_URL)}
           hitSlop={8}
-          style={local.donate}
+          style={({ pressed }) => [local.donate, pressed && { opacity: 0.8 }]}
           accessibilityRole="link"
           accessibilityHint="Opens a page about donating. It’s never required.">
-          <Ionicons name="heart-outline" size={15} color={colors.accent} />
+          <Ionicons name="heart" size={14} color={colors.goldLight} />
           <Text style={local.donateText}>Help keep Isms free</Text>
         </Pressable>
       </View>
@@ -217,21 +236,58 @@ const local = StyleSheet.create({
     backgroundColor: colors.sageSoft,
   },
   story: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius.md,
-    padding: space.lg,
-    gap: space.sm,
+    backgroundColor: colors.deep,
+    borderRadius: 24,
+    padding: space.xl,
+    paddingTop: space.xl + 2,
+    gap: space.md,
+    overflow: 'hidden',
+    boxShadow: '0 10px 30px rgba(10, 92, 82, 0.28)',
   },
-  storyHeading: {
-    fontSize: 12,
+  storyGlow: {
+    position: 'absolute',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    top: -130,
+    right: -100,
+    backgroundColor: colors.logoTeal,
+    opacity: 0.45,
+    pointerEvents: 'none',
+  },
+  storyHalo: { position: 'absolute', width: 84, height: 84 / HALO_ASPECT, top: 26, right: 26, pointerEvents: 'none' },
+  storyLabelRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  storyLabel: {
+    fontSize: 13,
     fontWeight: '700',
-    color: colors.accent,
+    color: colors.goldLight,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
-  storyText: { fontSize: 16, lineHeight: 24, color: colors.ink },
-  donate: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingTop: space.xs },
-  donateText: { fontSize: 14, fontWeight: '600', color: colors.accent },
+  storyLabelRule: { width: 32, height: 2, borderRadius: 1, backgroundColor: colors.gold },
+  storyQuoteMark: {
+    fontFamily: Platform.select({ web: 'Georgia, "Times New Roman", serif', android: 'serif', default: 'Georgia' }),
+    fontSize: 64,
+    lineHeight: 64,
+    height: 30,
+    marginBottom: -space.xs,
+    color: colors.gold,
+  },
+  storyText: { fontSize: 17, lineHeight: 27, color: '#FFFFFF' },
+  storySwoosh: { width: 190, height: 190 / SWOOSH_ASPECT, marginTop: -space.xs },
+  donate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(240, 219, 165, 0.4)',
+  },
+  donateText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
   question: { fontSize: 20, fontWeight: '700', color: colors.ink, letterSpacing: -0.2, marginTop: space.md },
   ask: { ...cardStyle, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg },
   askIcon: {

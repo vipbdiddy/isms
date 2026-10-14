@@ -53,6 +53,8 @@ Expo (React Native) + Expo Router, TypeScript.
 | `src/lib/db.ts`, `src/lib/auth.ts` | Talking to Supabase: data, sign-in |
 | `supabase/` | Database setup script and dashboard steps ([setup guide](supabase/README.md)) |
 | `public/` | The web version's page, home-screen icons and manifest (paths assume `/isms/app/`) |
+| `assets/` | The logo (`logo.svg`: the Illustrator file `isms_logo_teal.ai` with its background removed), its halo and swoosh for the "Why Isms" card, and the app icons, launch screen and browser icon made from it |
+| `src/components/Logo.tsx` | The logo, as shown in Home's header |
 | `app.config.js` | Sets the web version's address (`ISMS_WEB_BASE_URL`) only when building it |
 | `src/lib/seed.ts` | Example shared families so "Everyone" isn't empty |
 

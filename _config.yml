@@ -1,3 +1,5 @@
+# The site's name, shown at the top of the policy pages (the home page has the logo instead).
+title: Isms
 # The website is the Markdown pages in this folder. The app's code in app/ isn't part of it.
 exclude:
   - app
