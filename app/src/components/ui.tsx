@@ -1,6 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState, type ComponentProps, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type LayoutChangeEvent,
+  type TextInputProps,
+  type ViewStyle,
+} from 'react-native';
 
 import { cardStyle, colors, radius, space } from '../lib/theme';
 import { TOPICS } from '../lib/topics';
@@ -8,10 +18,21 @@ import type { KindFilter, Scope } from '../lib/types';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
-export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress?: () => void }) {
+export function Chip({
+  label,
+  selected,
+  onPress,
+  onLayout,
+}: {
+  label: string;
+  selected?: boolean;
+  onPress?: () => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
   return (
     <Pressable
       onPress={onPress}
+      onLayout={onLayout}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       style={[styles.chip, selected && styles.chipSelected]}>
@@ -20,7 +41,10 @@ export function Chip({ label, selected, onPress }: { label: string; selected?: b
   );
 }
 
-/** Horizontal (or wrapping) row of topic chips with multi-select. */
+/**
+ * Horizontal (or wrapping) row of topic chips with multi-select. In a horizontal row, a topic selected
+ * from elsewhere (like one tapped on Home) scrolls into view.
+ */
 export function TopicPicker({
   selected,
   onToggle,
@@ -30,12 +54,64 @@ export function TopicPicker({
   onToggle: (id: string) => void;
   wrap?: boolean;
 }) {
+  const row = useRef<ScrollView>(null);
+  const rowWidth = useRef(0);
+  const chipsAt = useRef<Record<string, { x: number; width: number }>>({});
+  const before = useRef<string[]>([]);
+  const tapped = useRef<string>(undefined);
+  const toShow = useRef<string>(undefined);
+
+  const show = () => {
+    const chip = toShow.current ? chipsAt.current[toShow.current] : undefined;
+    if (!chip || !rowWidth.current) return;
+    toShow.current = undefined;
+    // Leave a little of the chip before it showing, so it's clear the row scrolls back.
+    const x = chip.x + chip.width <= rowWidth.current ? 0 : chip.x - space.xl;
+    row.current?.scrollTo({ x, animated: false });
+  };
+
+  const key = selected.join();
+  useEffect(() => {
+    const added = selected.find((id) => !before.current.includes(id) && id !== tapped.current);
+    before.current = selected;
+    tapped.current = undefined;
+    if (!wrap && added) {
+      toShow.current = added;
+      show();
+    }
+    // `key` stands for `selected`, which is a new array on every render.
+  }, [key, wrap]);
+
   const chips = TOPICS.map((t) => (
-    <Chip key={t.id} label={t.label} selected={selected.includes(t.id)} onPress={() => onToggle(t.id)} />
+    <Chip
+      key={t.id}
+      label={t.label}
+      selected={selected.includes(t.id)}
+      onPress={() => {
+        tapped.current = t.id;
+        onToggle(t.id);
+      }}
+      onLayout={
+        wrap
+          ? undefined
+          : (e) => {
+              chipsAt.current[t.id] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
+              if (toShow.current === t.id) show();
+            }
+      }
+    />
   ));
   if (wrap) return <View style={styles.wrapRow}>{chips}</View>;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+    <ScrollView
+      ref={row}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scrollRow}
+      onLayout={(e) => {
+        rowWidth.current = e.nativeEvent.layout.width;
+        show();
+      }}>
       {chips}
     </ScrollView>
   );

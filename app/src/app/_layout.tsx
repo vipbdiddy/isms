@@ -31,6 +31,8 @@ function Root() {
       <Stack.Screen name="loved-one/[id]" options={{ title: '' }} />
       <Stack.Screen name="loved-one/edit" options={{ presentation: 'modal', title: 'Loved one' }} />
       <Stack.Screen name="loved-one/comments" options={{ title: 'Comments' }} />
+      <Stack.Screen name="loved-one/invite" options={{ title: 'Invite people to remember' }} />
+      <Stack.Screen name="choose" options={{ presentation: 'modal', title: 'Who is it about?' }} />
       <Stack.Screen name="ism/edit" options={{ presentation: 'modal', title: 'Add a memory' }} />
       <Stack.Screen name="ism/[id]" options={{ title: '' }} />
       <Stack.Screen name="person/[id]" options={{ title: '' }} />

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text } from 'react-native';
 
 import { IsmCard } from '../../components/IsmCard';
@@ -10,10 +11,20 @@ import type { KindFilter } from '../../lib/types';
 import { useScope } from '../../lib/useScope';
 
 export default function Ask() {
+  const { topic } = useLocalSearchParams<{ topic?: string }>();
   const { isms, lovedOnes, userId, viewer } = useStore();
   const [scope, setScope] = useScope();
   const [situation, setSituation] = useState('');
-  const [picked, setPicked] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string[]>(topic ? [topic] : []);
+
+  // Arriving from a topic on Home starts a new question about that situation. Forgetting the topic after
+  // means tapping the same one there again picks it again.
+  useEffect(() => {
+    if (!topic) return;
+    setSituation('');
+    setPicked([topic]);
+    router.setParams({ topic: undefined });
+  }, [topic]);
   const [kind, setKind] = useState<KindFilter>('all');
 
   const detected = useMemo(() => detectTopics(situation).filter((t) => !picked.includes(t)), [situation, picked]);

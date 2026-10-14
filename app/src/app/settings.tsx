@@ -5,6 +5,8 @@ import { ScrollView, Switch, Text, View } from 'react-native';
 import { NameField } from '../components/NameField';
 import { Button, DangerButton, ErrorNote, ScopeToggle, styles } from '../components/ui';
 import { deleteAccount, signOut } from '../lib/auth';
+import { DONATE_URL } from '../lib/config';
+import { openWebPage } from '../lib/share';
 import { useStore } from '../lib/store';
 import { colors, space } from '../lib/theme';
 
@@ -91,7 +93,7 @@ export default function SettingsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Public profile</Text>
             <Text style={styles.hint}>
-              Anyone on Ism’s can see your name on what you share with everyone, and open your profile to see it in one
+              Anyone on Isms can see your name on what you share with everyone, and open your profile to see it in one
               place. When this is off, only your friends and the people in your groups can.
             </Text>
           </View>
@@ -111,12 +113,21 @@ export default function SettingsScreen() {
       ) : null}
       <Text style={styles.muted}>
         Everything you add is private until you share a loved one with your friends, a group or everyone. Even then,
-        you can keep single quotes or stories private. Shared memories and comments that might hurt someone are checked
-        by Ism’s before others can see them. Other people see your name, never your email address. Your name always
-        shows with your comments and likes.
+        you can keep single quotes or stories private. The people who can see a loved one you shared can add their own
+        stories and quotes, unless you turn that off, and you can remove anything they add. Shared memories and
+        comments that might hurt someone are checked by Isms before others can see them. Other people see your name,
+        never your email address. Your name always shows with your comments and likes, and with what you add to
+        someone else’s loved one.
       </Text>
 
       {error ? <ErrorNote message={error} /> : null}
+
+      <Text style={styles.subheading}>Support Isms</Text>
+      <Text style={styles.muted}>
+        Isms is free, with no ads. If you’d like to help pay for hosting and keep it available for every family, you
+        can donate. It’s never required, and everything works the same either way.
+      </Text>
+      <Button title="Help keep Isms free" icon="heart-outline" variant="secondary" onPress={() => openWebPage(DONATE_URL)} />
 
       {session && (
         <>
