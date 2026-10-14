@@ -42,7 +42,7 @@ export default function IsmScreen() {
         <IsmCard ism={ism} showTime inPost />
         <LikedBy target={target} />
         <Text style={styles.subheading}>Comments</Text>
-        <CommentList target={target} memoryOwnerId={ism.ownerId} />
+        <CommentList target={target} memoryOwnerIds={lovedOne ? [ism.ownerId, lovedOne.ownerId] : [ism.ownerId]} />
       </ScrollView>
       <View style={[local.composer, { paddingBottom: space.md + insets.bottom }]}>
         <CommentComposer target={target} />

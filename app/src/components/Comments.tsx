@@ -17,8 +17,8 @@ import { Button, ErrorNote, TextButton, styles as ui } from './ui';
 /** The longest comment the database accepts. */
 const MAX_COMMENT = 1000;
 
-/** The comments on a quote, story or loved one, oldest first. `memoryOwnerId` may delete any of them. */
-export function CommentList({ target, memoryOwnerId }: { target: Target; memoryOwnerId: string }) {
+/** The comments on a quote, story or loved one, oldest first. `memoryOwnerIds` may delete any of them. */
+export function CommentList({ target, memoryOwnerIds }: { target: Target; memoryOwnerIds: readonly string[] }) {
   const { commentsOn, userId } = useStore();
   const comments = commentsOn(target);
   if (comments.length === 0) {
@@ -27,13 +27,13 @@ export function CommentList({ target, memoryOwnerId }: { target: Target; memoryO
   return (
     <View style={{ gap: space.md }}>
       {comments.map((comment) => (
-        <CommentRow key={comment.id} comment={comment} memoryOwnerId={memoryOwnerId} />
+        <CommentRow key={comment.id} comment={comment} memoryOwnerIds={memoryOwnerIds} />
       ))}
     </View>
   );
 }
 
-function CommentRow({ comment, memoryOwnerId }: { comment: Comment; memoryOwnerId: string }) {
+function CommentRow({ comment, memoryOwnerIds }: { comment: Comment; memoryOwnerIds: readonly string[] }) {
   const { userId, nameOf, deleteComment, reportComment } = useStore();
   const [confirming, setConfirming] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -41,7 +41,7 @@ function CommentRow({ comment, memoryOwnerId }: { comment: Comment; memoryOwnerI
   const [error, setError] = useState<string>();
   const mine = comment.authorId === userId;
   const name = nameOf(comment.authorId) || (mine ? 'You' : 'Someone');
-  const canDelete = canDeleteComment(comment, userId, memoryOwnerId);
+  const canDelete = canDeleteComment(comment, userId, memoryOwnerIds);
   const canReport = !!userId && !mine;
 
   if (reported) {

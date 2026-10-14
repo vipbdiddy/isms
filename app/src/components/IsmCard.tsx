@@ -46,7 +46,8 @@ export function IsmCard({
   const lovedOne = getLovedOne(ism.lovedOneId);
   const mine = ism.ownerId === userId;
   const example = ism.ownerId === COMMUNITY_OWNER;
-  const canReport = !!userId && !mine && !example;
+  // Whoever added the loved one removes what others added to them, on their page, rather than reporting it.
+  const canReport = !!userId && !mine && !example && lovedOne?.ownerId !== userId;
   const saved = savedIsmIds.has(ism.id);
   const story = ism.kind === 'story';
   const long = story && ism.text.length > PREVIEW_CHARS && !inPost;

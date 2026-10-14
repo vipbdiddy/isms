@@ -1003,7 +1003,7 @@ begin
 
   if target_ism is not null then
     select i.owner_id, i.review_status,
-      not i.keep_private and public.is_shared_with_me(l.visibility, l.owner_id, l.group_id)
+      not i.keep_private and (l.owner_id = me or public.is_shared_with_me(l.visibility, l.owner_id, l.group_id))
     into item_owner, current_status, shared_with_me
     from public.isms i join public.loved_ones l on l.id = i.loved_one_id
     where i.id = target_ism;
@@ -1060,11 +1060,13 @@ begin
   into author, current_status, on_ism, on_loved_one
   from public.comments c where c.id = target_comment;
 
-  -- What it's on has to be yours, or shared with you (the same rule as the policies below).
+  -- What it's on has to be yours, or shared with you (the same rule as the policies below), or added
+  -- to your loved one.
   if on_ism is not null then
     select i.owner_id = me or (
-        not i.keep_private and i.review_status in ('ok', 'approved') and l.review_status in ('ok', 'approved')
-        and public.is_shared_with_me(l.visibility, l.owner_id, l.group_id))
+        not i.keep_private and i.review_status in ('ok', 'approved')
+        and (l.owner_id = me or (
+          l.review_status in ('ok', 'approved') and public.is_shared_with_me(l.visibility, l.owner_id, l.group_id))))
     into shared_with_me
     from public.isms i join public.loved_ones l on l.id = i.loved_one_id
     where i.id = on_ism;
@@ -1266,11 +1268,12 @@ create policy "read own or shared isms" on public.isms
       not keep_private
       and review_status in ('ok', 'approved')
       and not exists (select 1 from public.reports r where r.reporter_id = auth.uid() and r.ism_id = isms.id)
-      -- Its loved one must be visible to you too (that rule is checked for this lookup as well).
+      -- Its loved one must be yours, or shared with you (that rule is checked for this lookup as well):
+      -- what others add to your loved ones shows to you.
       and exists (
         select 1 from public.loved_ones l
         where l.id = isms.loved_one_id
-          and public.is_shared_with_me(l.visibility, l.owner_id, l.group_id)
+          and (l.owner_id = auth.uid() or public.is_shared_with_me(l.visibility, l.owner_id, l.group_id))
       )
     )
   );

@@ -30,7 +30,7 @@ export default function LovedOneComments() {
         <LovedOneRow lovedOne={lovedOne} />
         <LikedBy target={target} />
         <Text style={styles.muted}>A kind word for their family, or a memory of {lovedOne.name}.</Text>
-        <CommentList target={target} memoryOwnerId={lovedOne.ownerId} />
+        <CommentList target={target} memoryOwnerIds={[lovedOne.ownerId]} />
       </ScrollView>
       <View style={[local.composer, { paddingBottom: space.md + insets.bottom }]}>
         <CommentComposer target={target} />

@@ -29,9 +29,12 @@ export function likedByLine(others: readonly string[], mine: boolean): string {
   return `Liked by ${people.slice(0, 2).join(', ')} and ${more} others`;
 }
 
-/** Comments can be deleted by whoever wrote them and by whoever shared the memory they're on. */
-export function canDeleteComment(comment: Comment, userId: string, memoryOwnerId: string | undefined): boolean {
-  return !!userId && (comment.authorId === userId || memoryOwnerId === userId);
+/**
+ * Comments can be deleted by whoever wrote them and by whoever shared the memory they're on: on a quote
+ * or story someone added to another person's loved one, that's both of them.
+ */
+export function canDeleteComment(comment: Comment, userId: string, memoryOwnerIds: readonly string[]): boolean {
+  return !!userId && (comment.authorId === userId || memoryOwnerIds.includes(userId));
 }
 
 /** Who the viewer knows: their friends, the people in their groups, and those with a public profile. */
