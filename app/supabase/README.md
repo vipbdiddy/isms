@@ -1,4 +1,4 @@
-# Setting up Supabase for Ism's
+# Setting up Supabase for Isms
 
 The app talks to the Supabase project in `src/lib/config.ts`. These steps are done once, in the Supabase dashboard.
 

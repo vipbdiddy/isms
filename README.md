@@ -1,4 +1,4 @@
-# Ism's
+# Isms
 
 Keep the sayings and stories of the people you've lost, and find the right one when you need it.
 

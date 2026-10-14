@@ -30,6 +30,11 @@ export interface LovedOne {
   visibility: Visibility;
   /** The group they're shared with, when `visibility` is 'group'. */
   groupId?: string;
+  /**
+   * Whether the people who can see them may add their own quotes and stories (missing means yes).
+   * The owner can always remove what others added.
+   */
+  allowContributions?: boolean;
   /** Missing for the bundled examples, which are always fine. */
   reviewStatus?: ReviewStatus;
   createdAt: number;

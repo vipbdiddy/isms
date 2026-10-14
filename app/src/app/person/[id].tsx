@@ -52,6 +52,7 @@ export default function PersonScreen() {
     answerFriendRequest,
     removeFriend,
     loading,
+    loaded,
     refresh,
   } = useStore();
   const [shown, setShown] = useState(PAGE);
@@ -84,7 +85,7 @@ export default function PersonScreen() {
     );
   }
   if (!name && !open) {
-    return <Empty title={loading ? 'Loading…' : 'We couldn’t find this person.'} />;
+    return <Empty title={loaded ? 'We couldn’t find this person.' : 'Loading…'} />;
   }
 
   const friendship = friendships.find((f) => f.otherId === id);
@@ -198,7 +199,7 @@ export default function PersonScreen() {
           <Text style={styles.body}>
             This is your profile.{' '}
             {profile?.publicProfile
-              ? 'It’s public: anyone on Ism’s can open it, and sees what you share with them.'
+              ? 'It’s public: anyone on Isms can open it, and sees what you share with them.'
               : 'Your friends and the people in your groups can open it, and see what you share with them.'}
           </Text>
           <TextButton title="Change this in Settings" onPress={() => router.push('/settings')} />

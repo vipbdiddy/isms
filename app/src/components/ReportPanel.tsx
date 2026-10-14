@@ -34,7 +34,7 @@ export function ReportPanel({ onReport, onCancel }: { onReport: (reason: string)
           <Chip key={r} label={r} selected={reason === r} onPress={() => setReason(r)} />
         ))}
       </View>
-      <Text style={styles.hint}>It will be hidden for you right away, and someone at Ism’s will take a look.</Text>
+      <Text style={styles.hint}>It will be hidden for you right away, and someone at Isms will take a look.</Text>
       {error ? <ErrorNote message={error} /> : null}
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <View style={{ flex: 1 }}>
@@ -62,7 +62,7 @@ export function ReviewNote({ status }: { status?: string }) {
       <Text style={[local.noteText, !waiting && { color: colors.danger }]}>
         {waiting
           ? 'Waiting for a quick review. Only you can see it until then.'
-          : 'Hidden from others: Ism’s found it might be hurtful. Only you can see it.'}
+          : 'Hidden from others: Isms found it might be hurtful. Only you can see it.'}
       </Text>
     </View>
   );

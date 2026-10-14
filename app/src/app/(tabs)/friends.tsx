@@ -1,18 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { NameField } from '../../components/NameField';
 import { PersonRow, mutualFriendsNote } from '../../components/PersonRow';
 import { openGroup } from '../../components/SharedBy';
 import { Button, Card, ErrorNote, Field, TextButton, styles } from '../../components/ui';
+import { WEBSITE } from '../../lib/config';
 import { contactsAvailable } from '../../lib/contacts';
+import { shareMessage } from '../../lib/share';
 import { useStore } from '../../lib/store';
 import { cardStyle, colors, radius, space } from '../../lib/theme';
 import type { FriendRequestResult, Group, PersonResult, Relationship } from '../../lib/types';
-
-const WEBSITE = 'https://vipbdiddy.github.io/isms/';
 
 /** Wait this long after the last letter typed before searching. */
 const SEARCH_DELAY_MS = 300;
@@ -97,7 +97,7 @@ export default function Friends() {
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <Text style={styles.heading}>Share memories with friends</Text>
         <Text style={styles.body}>
-          Add your friends and family on Ism’s. They’ll see the loved ones you share with friends, and you’ll see theirs.
+          Add your friends and family on Isms. They’ll see the loved ones you share with friends, and you’ll see theirs.
         </Text>
         <Button title="Sign in or create an account" onPress={() => router.push('/account')} />
       </ScrollView>
@@ -180,9 +180,10 @@ export default function Friends() {
   };
 
   const invite = () =>
-    Share.share({
-      message: `I’m keeping the sayings and stories of the people we miss on Ism’s. Join me so we can share them: ${WEBSITE}`,
-    }).catch(() => undefined);
+    shareMessage(`I’m keeping the sayings and stories of the people we miss on Isms. Join me so we can share them: ${WEBSITE}`).then(
+      (how) => how === 'copied' && setMessage('Copied. Paste it into a text or an email.'),
+      () => setError('Couldn’t share it. Try again.'),
+    );
 
   /** A person found by search or in contacts, with the one thing you can do next. */
   const found = (person: PersonResult) => {
@@ -270,7 +271,7 @@ export default function Friends() {
           {contacts.step === 'start' && (
             <>
               <Text style={[styles.body, { fontWeight: '600' }]}>Find friends from your contacts</Text>
-              <Text style={styles.muted}>See which of the people in your phone already use Ism’s.</Text>
+              <Text style={styles.muted}>See which of the people in your phone already use Isms.</Text>
               <Button title="Find friends from contacts" icon="people-outline" variant="secondary" onPress={() => setContacts({ step: 'explain' })} />
             </>
           )}
@@ -278,8 +279,8 @@ export default function Friends() {
             <>
               <Text style={[styles.body, { fontWeight: '600' }]}>Before you allow it</Text>
               <Text style={styles.body}>
-                Your phone will ask to let Ism’s see your contacts. Ism’s only looks at their email addresses, turns each one
-                into a scrambled code on your phone, and checks those codes against people on Ism’s. Your contacts are never
+                Your phone will ask to let Isms see your contacts. Isms only looks at their email addresses, turns each one
+                into a scrambled code on your phone, and checks those codes against people on Isms. Your contacts are never
                 uploaded or saved.
               </Text>
               <View style={local.row}>
@@ -296,7 +297,7 @@ export default function Friends() {
           {contacts.step === 'denied' && (
             <>
               <Text style={styles.body}>
-                Ism’s can’t see your contacts. If you change your mind, allow it in your phone’s Settings → Apps → Ism’s →
+                Isms can’t see your contacts. If you change your mind, allow it in your phone’s Settings → Apps → Isms →
                 Permissions, then try again.
               </Text>
               <TextButton title="Try again" onPress={lookInContacts} />
@@ -306,7 +307,7 @@ export default function Friends() {
             <>
               <Text style={[styles.body, { fontWeight: '600' }]}>From your contacts</Text>
               {contacts.people.length === 0 ? (
-                <Text style={styles.muted}>None of your contacts are on Ism’s yet. Invite them below.</Text>
+                <Text style={styles.muted}>None of your contacts are on Isms yet. Invite them below.</Text>
               ) : (
                 contacts.people.map(found)
               )}
@@ -385,7 +386,7 @@ export default function Friends() {
 
       <Text style={styles.subheading}>Your friends</Text>
       {friends.length === 0 ? (
-        <Text style={styles.muted}>No friends yet. Search for them above, or invite them to Ism’s.</Text>
+        <Text style={styles.muted}>No friends yet. Search for them above, or invite them to Isms.</Text>
       ) : (
         friends.map((f) => (
           <FriendRow
@@ -407,7 +408,7 @@ export default function Friends() {
       ))}
       <NewGroup />
 
-      <Button title="Invite someone to Ism’s" icon="share-outline" variant="secondary" onPress={invite} />
+      <Button title="Invite someone to Isms" icon="share-outline" variant="secondary" onPress={invite} />
     </ScrollView>
   );
 }

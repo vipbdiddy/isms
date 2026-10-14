@@ -62,6 +62,7 @@ export default function GroupScreen() {
     renameGroup,
     searchPeople,
     loading,
+    loaded,
     refresh,
   } = useStore();
   const [error, setError] = useState<string>();
@@ -121,7 +122,7 @@ export default function GroupScreen() {
   };
 
   if (!group || (!me && !invite)) {
-    return <Empty title={loading ? 'Loading…' : 'We couldn’t find this group. You may not be in it any more.'} />;
+    return <Empty title={loaded ? 'We couldn’t find this group. You may not be in it any more.' : 'Loading…'} />;
   }
 
   const refreshControl = <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.accent} />;

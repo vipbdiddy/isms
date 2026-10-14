@@ -1,13 +1,14 @@
-# Ism's
+# Isms
 
 A mobile app for keeping the sayings — the "isms" — of people you've lost, and finding the right one when you need it.
 
-- **Loved ones** – add the people you miss with a photo and their obituary, then the things they always used to say (quotes) and longer memories about them (stories). When someone adds a person who's already here (same name and years, or the same obituary), the app asks "Is this who you're looking for?".
+- **Loved ones** – add the people you miss with a photo and their obituary, then the things they always used to say (quotes) and longer memories about them (stories). The people who can see a loved one can add their own stories and quotes to them (the owner can turn this off and remove anything added), and "Invite someone who knew them" sends a link to their page. When someone adds a person who's already here (same name and years, or the same obituary), the app asks "Is this who you're looking for?".
 - **Ask** – describe what you're going through ("my brother wants to borrow money again") or pick a situation, and get the sayings that fit.
 - **Browse** – search everything, and filter by topic and by quotes, stories, or both.
-- **Home** – one saying a day, the latest memories from you, your friends and your groups, and everything you've saved (the bookmark).
+- **Home** – why Isms exists (Bryce's story), the three things to do (add a loved one, share a story or quote, invite someone who knew them), "Whose wisdom are you looking for today?" with Ask and the topics, then one saying a day, the latest memories from you, your friends and your groups, and everything you've saved (the bookmark).
+- **Help keep Isms free** – a quiet link under the story and in Settings opens the donate page on the website (`DONATE_URL` in `src/lib/config.ts`). Put the real donation link on [`donate.md`](../donate.md), so the app doesn't need an update.
 - **Likes and comments** – like (♥) any quote, story or loved one you can see, and comment on it. Each quote or story has its own page with its comments; loved ones have a comments page for kind words to their family. Whoever shared something can delete comments on it.
-- **Friends** – search for people by name, or (with permission) see which of your contacts use Ism's, and send a friend request; they accept or decline. Friends see the loved ones you share with Friends. "Let people find me" in Settings turns off being found.
+- **Friends** – search for people by name, or (with permission) see which of your contacts use Isms, and send a friend request; they accept or decline. Friends see the loved ones you share with Friends. "Let people find me" in Settings turns off being found.
 - **Groups** – make a group, like your family, from the Friends tab, and share loved ones with it. Members invite their friends and people they find by name; each person invited joins or says no. Leaving (or being removed) makes what you shared with the group private again.
 - **Profiles** – tap a name to see what that person shares with you. Friends and people in your groups can open each other's profiles; "Public profile" in Settings opens yours to everyone.
 - **Kindness review** – shared quotes, stories, loved ones and comments whose words might hurt someone wait for a reviewer before anyone else sees them, and anyone can report something shared. Reviewers allow or remove them on the Review screen.
@@ -36,8 +37,10 @@ Expo (React Native) + Expo Router, TypeScript.
 | `src/app/(tabs)/` | Home, Ask, Browse, Loved ones, Friends |
 | `src/app/settings.tsx` | Settings, opened from the ⚙ button |
 | `src/app/review.tsx` | The reviewers' list of held and reported memories |
-| `src/app/loved-one/` | A loved one's page, their comments, and the add/edit form |
+| `src/app/loved-one/` | A loved one's page, their comments, inviting people to add memories, and the add/edit form |
 | `src/app/ism/` | A quote or story with its comments (`[id].tsx`), and the add/edit form |
+| `src/app/choose.tsx` | "Who is it about?", for Home's Share and Invite buttons |
+| `src/lib/share.ts` | Sharing a message (or copying it, in browsers that can't share), and opening web pages |
 | `src/app/group/[id].tsx` | A group: what's shared with it, members, invitations, leaving |
 | `src/app/person/[id].tsx` | Someone's profile |
 | `src/lib/photos.ts` | Picking a photo and keeping a copy on the device |

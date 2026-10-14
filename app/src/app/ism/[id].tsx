@@ -15,13 +15,13 @@ import { colors, space } from '../../lib/theme';
 /** A quote or story on its own, with who liked it and its comments. */
 export default function IsmScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { isms, getLovedOne, viewer, loading } = useStore();
+  const { isms, getLovedOne, viewer, loaded } = useStore();
   const insets = useSafeAreaInsets();
   const ism = isms.find((i) => i.id === id);
   const lovedOne = ism ? getLovedOne(ism.lovedOneId) : undefined;
 
   if (!ism || !canSee(ism, lovedOne, viewer)) {
-    return <Empty title={loading ? 'Loading…' : 'We couldn’t find this memory. It may have been deleted or made private.'} />;
+    return <Empty title={loaded ? 'We couldn’t find this memory. It may have been deleted or made private.' : 'Loading…'} />;
   }
   const target = { ismId: ism.id };
 
@@ -42,7 +42,7 @@ export default function IsmScreen() {
         <IsmCard ism={ism} showTime inPost />
         <LikedBy target={target} />
         <Text style={styles.subheading}>Comments</Text>
-        <CommentList target={target} memoryOwnerId={ism.ownerId} />
+        <CommentList target={target} memoryOwnerIds={lovedOne ? [ism.ownerId, lovedOne.ownerId] : [ism.ownerId]} />
       </ScrollView>
       <View style={[local.composer, { paddingBottom: space.md + insets.bottom }]}>
         <CommentComposer target={target} />

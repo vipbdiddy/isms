@@ -15,21 +15,27 @@ export const openGroup = (id: string) => router.push({ pathname: '/group/[id]', 
  * "Shared by Ann in Lee family · 2 hr ago": the name opens their profile and the group its page.
  * People whose profile you can't see read "Shared by their family". For your own, shows `own`
  * (or nothing), and `after` either way.
+ *
+ * `authorId` is who added a quote or story, when that's someone other than whoever added the loved
+ * one. Their name always shows (as with comments), or "someone who knew them" until it loads.
  */
 export function SharedBy({
   lovedOne,
+  authorId,
   own,
   after,
   style,
 }: {
   lovedOne: Pick<LovedOne, 'ownerId' | 'visibility' | 'groupId'>;
+  authorId?: string;
   own?: string;
   /** Added at the end, like " · 2 hr ago". */
   after?: string;
   style?: TextStyle;
 }) {
   const { userId, knows, nameOf, sharedBy, getGroup } = useStore();
-  const { ownerId } = lovedOne;
+  const ownerId = authorId ?? lovedOne.ownerId;
+  const addedByOther = ownerId !== lovedOne.ownerId;
   const group = lovedOne.visibility === 'group' && lovedOne.groupId ? getGroup(lovedOne.groupId) : undefined;
   const groupLink = group ? (
     <>
@@ -50,10 +56,10 @@ export function SharedBy({
     );
   }
   const name = nameOf(ownerId);
-  if (!knows(ownerId) || !name) {
+  if (!name || (!addedByOther && !knows(ownerId))) {
     return (
       <Text style={style}>
-        {sharedBy(ownerId)}
+        {addedByOther ? 'Shared by someone who knew them' : sharedBy(ownerId)}
         {groupLink}
         {after}
       </Text>

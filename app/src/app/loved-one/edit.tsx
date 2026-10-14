@@ -1,11 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Avatar } from '../../components/Avatar';
 import { sharedWithLabel } from '../../components/LovedOneRow';
 import { SharingPicker } from '../../components/SharingPicker';
-import { Button, DangerButton, ErrorNote, Field, TextButton, styles } from '../../components/ui';
+import { Button, DangerButton, Empty, ErrorNote, Field, TextButton, styles } from '../../components/ui';
 import { canSeeLovedOne } from '../../lib/advice';
 import { findPossibleDuplicates } from '../../lib/duplicates';
 import { pickPhoto, type PickedPhoto } from '../../lib/photos';
@@ -16,10 +16,18 @@ import type { LovedOne, Visibility } from '../../lib/types';
 
 export default function EditLovedOne() {
   // `groupId`: adding someone from a group's page shares them with that group to start with.
-  const { id, groupId: forGroup } = useLocalSearchParams<{ id?: string; groupId?: string }>();
-  const { getLovedOne, addLovedOne, updateLovedOne, deleteLovedOne, userId, lovedOnes, viewer } = useStore();
+  const { id, groupId } = useLocalSearchParams<{ id?: string; groupId?: string }>();
+  const { getLovedOne, userId, loaded } = useStore();
   const existing = id ? getLovedOne(id) : undefined;
-  const editable = !existing || existing.ownerId === userId;
+  // Opened from a link, or after the page reloaded, they may still be loading. The form starts from
+  // what's saved, so it waits for them.
+  if (id && !existing) return <Empty title={loaded ? 'We couldn’t find this person.' : 'Loading…'} />;
+  if (!userId || (existing && existing.ownerId !== userId)) return null;
+  return <LovedOneForm key={existing?.id ?? 'new'} existing={existing} forGroup={groupId} userId={userId} />;
+}
+
+function LovedOneForm({ existing, forGroup, userId }: { existing?: LovedOne; forGroup?: string; userId: string }) {
+  const { addLovedOne, updateLovedOne, deleteLovedOne, lovedOnes, viewer } = useStore();
 
   const [name, setName] = useState(existing?.name ?? '');
   const [relationship, setRelationship] = useState(existing?.relationship ?? '');
@@ -30,6 +38,7 @@ export default function EditLovedOne() {
   const [photo, setPhoto] = useState<PickedPhoto | null>();
   const [visibility, setVisibility] = useState<Visibility>(existing?.visibility ?? (forGroup ? 'group' : 'private'));
   const [groupId, setGroupId] = useState<string | undefined>(existing?.groupId ?? forGroup);
+  const [allowContributions, setAllowContributions] = useState(existing?.allowContributions !== false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
   // People they've said "No, this is someone else" to.
@@ -48,8 +57,6 @@ export default function EditLovedOne() {
           ),
     [existing, name, years, obituary, lovedOnes, notThem, viewer],
   );
-
-  if (!editable || !userId) return null;
 
   const photoUri = photo === null ? undefined : (photo?.previewUri ?? existing?.photoUri);
 
@@ -71,6 +78,7 @@ export default function EditLovedOne() {
       obituary: obituary.trim() || undefined,
       visibility,
       groupId: visibility === 'group' ? groupId : undefined,
+      allowContributions,
     };
     setSaving(true);
     setError(undefined);
@@ -133,6 +141,24 @@ export default function EditLovedOne() {
           setGroupId(nextGroup);
         }}
       />
+      {visibility !== 'private' ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Let others add memories</Text>
+            <Text style={styles.hint}>
+              People who can see {name.trim() || 'them'} can add their own quotes and stories, with their name. You can
+              remove anything they add.
+            </Text>
+          </View>
+          <Switch
+            value={allowContributions}
+            onValueChange={setAllowContributions}
+            trackColor={{ true: colors.accent, false: colors.border }}
+            thumbColor={colors.card}
+            accessibilityLabel="Let others add memories"
+          />
+        </View>
+      ) : null}
 
       {lookalikes.length > 0 && (
         <LookalikeCard
@@ -152,7 +178,7 @@ export default function EditLovedOne() {
       {existing && (
         <DangerButton
           title="Remove"
-          message={`Remove ${existing.name}? This deletes them and every quote and story you added for them.`}
+          message={`Remove ${existing.name}? This deletes them and every quote and story added for them, including any other people added.`}
           confirmTitle="Remove"
           onConfirm={async () => {
             try {
@@ -169,7 +195,7 @@ export default function EditLovedOne() {
   );
 }
 
-/** "Is this who you're looking for?": people already in Ism's who look like the one being added. */
+/** "Is this who you're looking for?": people already in Isms who look like the one being added. */
 function LookalikeCard({
   people,
   userId,
@@ -199,7 +225,16 @@ function LookalikeCard({
               <Text style={local.whose}>
                 {mine ? `You already added them · ${sharedWithLabel(person)}` : sharedBy(person.ownerId)}
               </Text>
-              <TextButton title={mine ? 'Yes, open their page' : 'Yes, see their memories'} onPress={() => onOpen(person.id)} />
+              <TextButton
+                title={
+                  mine
+                    ? 'Yes, open their page'
+                    : person.allowContributions !== false
+                      ? 'Yes, add your memories to their page'
+                      : 'Yes, see their memories'
+                }
+                onPress={() => onOpen(person.id)}
+              />
             </View>
           </View>
         );

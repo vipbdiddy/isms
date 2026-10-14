@@ -70,12 +70,12 @@ export function SharingPicker({
     visibility === 'private'
       ? 'Only you can see them and their memories.'
       : visibility === 'friends'
-        ? 'You and your friends on Ism’s can see them and their memories.'
+        ? 'You and your friends on Isms can see them and their memories.'
         : visibility === 'group'
           ? group
             ? `Everyone in ${group.name} can see them and their memories.`
             : 'Pick one of your groups, or make one for your family.'
-          : 'Anyone using Ism’s can see them and their memories, even people who aren’t signed in.';
+          : 'Anyone using Isms can see them and their memories, even people who aren’t signed in.';
 
   return (
     <View style={styles.field}>
@@ -122,7 +122,7 @@ export function SharingPicker({
         {hint}
         {visibility === 'private'
           ? ''
-          : ' You can still keep single quotes or stories private. Anything that might hurt someone is checked by Ism’s before others see it.'}
+          : ' You can still keep single quotes or stories private. Anything that might hurt someone is checked by Isms before others see it.'}
       </Text>
     </View>
   );

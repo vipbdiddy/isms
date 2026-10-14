@@ -8,12 +8,12 @@ import { IsmCard } from '../../components/IsmCard';
 import { LikeButton, LikedBy } from '../../components/Reactions';
 import { ReportPanel, ReviewNote } from '../../components/ReportPanel';
 import { SharedBy, openGroup } from '../../components/SharedBy';
-import { Button, Empty, KindToggle, TextButton, styles } from '../../components/ui';
-import { canSee, canSeeLovedOne, isShared, matchesKind } from '../../lib/advice';
+import { Button, Empty, ErrorNote, KindToggle, TextButton, styles } from '../../components/ui';
+import { canContribute, canSee, canSeeLovedOne, isShared, matchesKind } from '../../lib/advice';
 import { COMMUNITY_OWNER } from '../../lib/seed';
 import { useStore } from '../../lib/store';
 import { cardStyle, colors, space } from '../../lib/theme';
-import type { Group, KindFilter, Visibility } from '../../lib/types';
+import type { Group, Ism, KindFilter, Visibility } from '../../lib/types';
 
 /** Who can see your own loved one, said on their page. */
 function ownStatus(visibility: Visibility, group: Group | undefined) {
@@ -35,7 +35,7 @@ function ownStatus(visibility: Visibility, group: Group | undefined) {
         'Shared with a group.'
       );
     case 'public':
-      return 'Shared with everyone. Anyone using Ism’s can see their quotes and stories.';
+      return 'Shared with everyone. Anyone using Isms can see their quotes and stories.';
   }
 }
 
@@ -44,7 +44,7 @@ const OBITUARY_PREVIEW_LINES = 5;
 
 export default function LovedOneScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getLovedOne, getGroup, isms, userId, viewer, report, commentsOn } = useStore();
+  const { getLovedOne, getGroup, isms, userId, viewer, report, commentsOn, loaded } = useStore();
   const [kind, setKind] = useState<KindFilter>('all');
   const [obituaryOpen, setObituaryOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -53,14 +53,23 @@ export default function LovedOneScreen() {
 
   if (reported) {
     return (
-      <Empty title="Thanks for letting us know. They’re hidden for you now, and someone at Ism’s will take a look.">
+      <Empty title="Thanks for letting us know. They’re hidden for you now, and someone at Isms will take a look.">
         <Button title="Go back" variant="secondary" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       </Empty>
     );
   }
 
   if (!lovedOne || !canSeeLovedOne(lovedOne, viewer)) {
-    return <Empty title="We couldn't find this person." />;
+    if (!loaded) return <Empty title="Loading…" />;
+    // Someone opening a link they were sent: they may only need to sign in.
+    if (!userId) {
+      return (
+        <Empty title="Sign in to see them. If they were shared with you, their page opens once you’re in.">
+          <Button title="Sign in or create an account" onPress={() => router.push('/account')} />
+        </Empty>
+      );
+    }
+    return <Empty title="We couldn’t find this person. They may not be shared with you." />;
   }
 
   const mine = lovedOne.ownerId === userId;
@@ -71,8 +80,12 @@ export default function LovedOneScreen() {
   const group = lovedOne.groupId ? getGroup(lovedOne.groupId) : undefined;
   const theirs = isms.filter((i) => i.lovedOneId === id && canSee(i, lovedOne, viewer));
   const shown = theirs.filter((i) => matchesKind(i, kind));
-  const add = (k: 'quote' | 'story') =>
-    router.push({ pathname: '/ism/edit', params: { lovedOneId: lovedOne.id, kind: k } });
+  const hasBoth = theirs.some((i) => i.kind === 'quote') && theirs.some((i) => i.kind === 'story');
+  const firstName = lovedOne.name.trim().split(/\s+/)[0];
+  // Signed out, a shared loved one's page still offers to add a memory, after signing in.
+  const canAdd = canContribute(lovedOne, viewer) || (!userId && !example && lovedOne.allowContributions !== false);
+  const add = () =>
+    userId ? router.push({ pathname: '/ism/edit', params: { lovedOneId: lovedOne.id } }) : router.push('/account');
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -135,6 +148,43 @@ export default function LovedOneScreen() {
         />
       ) : null}
 
+      {canAdd || mine ? (
+        <View style={{ gap: space.sm }}>
+          {canAdd ? <Button title="Add a story or quote" icon="add" onPress={add} /> : null}
+          {mine ? (
+            <Button
+              title={`Invite someone who knew ${firstName}`}
+              icon="mail-outline"
+              variant="secondary"
+              onPress={() => router.push({ pathname: '/loved-one/invite', params: { id: lovedOne.id } })}
+            />
+          ) : null}
+        </View>
+      ) : null}
+
+      <Text style={styles.subheading}>
+        Their stories and sayings{theirs.length ? ` (${theirs.length})` : ''}
+      </Text>
+      {hasBoth ? <KindToggle value={kind} onChange={setKind} /> : null}
+      {shown.length === 0 ? (
+        <Text style={styles.muted}>
+          {theirs.length > 0
+            ? kind === 'quote'
+              ? 'No quotes yet.'
+              : 'No stories yet.'
+            : canAdd
+              ? `Nothing here yet. What did ${firstName} always tell you? What story do you tell about them?`
+              : 'Nothing here yet.'}
+        </Text>
+      ) : (
+        shown.map((ism) => (
+          <View key={ism.id} style={{ gap: 4 }}>
+            <IsmCard ism={ism} showAuthor={false} showCredit={ism.ownerId !== lovedOne.ownerId} />
+            <MemoryActions ism={ism} lovedOneOwnerId={lovedOne.ownerId} shared={lovedOne.visibility !== 'private'} />
+          </View>
+        ))
+      )}
+
       {lovedOne.obituary ? (
         <View style={local.obituary}>
           <Text style={styles.subheading}>Obituary</Text>
@@ -146,49 +196,55 @@ export default function LovedOneScreen() {
           </Text>
         </View>
       ) : null}
-
-      {mine && (
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <View style={{ flex: 1 }}>
-            <Button title="Quote" icon="add" onPress={() => add('quote')} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button title="Story" icon="add" onPress={() => add('story')} />
-          </View>
-        </View>
-      )}
-
-      {theirs.length > 0 && <KindToggle value={kind} onChange={setKind} />}
-
-      {shown.length === 0 ? (
-        <Empty
-          title={
-            theirs.length === 0
-              ? 'Nothing here yet. What did they always tell you? What story do you tell about them?'
-              : kind === 'quote'
-                ? 'No quotes yet.'
-                : 'No stories yet.'
-          }
-        />
-      ) : (
-        shown.map((ism) => (
-          <View key={ism.id} style={{ gap: 4 }}>
-            <IsmCard ism={ism} showAuthor={false} />
-            {mine && (
-              <Text
-                style={[styles.muted, { textAlign: 'right', color: colors.accent }]}
-                onPress={() => router.push({ pathname: '/ism/edit', params: { lovedOneId: lovedOne.id, id: ism.id } })}>
-                {ism.keepPrivate && lovedOne.visibility !== 'private' ? 'Private · ' : ''}Edit
-              </Text>
-            )}
-          </View>
-        ))
-      )}
     </ScrollView>
   );
 }
 
+/** Under a quote or story: Edit for whoever added it; Remove for whoever added the loved one. */
+function MemoryActions({ ism, lovedOneOwnerId, shared }: { ism: Ism; lovedOneOwnerId: string; shared: boolean }) {
+  const { userId, deleteIsm } = useStore();
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string>();
+  if (ism.ownerId === userId) {
+    return (
+      <Text
+        style={local.action}
+        onPress={() => router.push({ pathname: '/ism/edit', params: { lovedOneId: ism.lovedOneId, id: ism.id } })}>
+        {ism.keepPrivate && shared ? 'Private · ' : ''}Edit
+      </Text>
+    );
+  }
+  if (lovedOneOwnerId !== userId) return null;
+  if (!asking) {
+    return (
+      <Text style={[local.action, { color: colors.muted }]} onPress={() => setAsking(true)}>
+        Remove
+      </Text>
+    );
+  }
+  return (
+    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+      <View style={{ flexDirection: 'row', gap: space.lg, alignItems: 'center' }}>
+        <Text style={styles.muted}>Remove what they added?</Text>
+        <TextButton title="Cancel" color={colors.muted} onPress={() => setAsking(false)} />
+        <TextButton
+          title="Remove"
+          color={colors.danger}
+          onPress={() =>
+            deleteIsm(ism.id).catch((e) => {
+              console.warn('Could not remove', e);
+              setError('Couldn’t remove it. Check your connection and try again.');
+            })
+          }
+        />
+      </View>
+      {error ? <ErrorNote message={error} /> : null}
+    </View>
+  );
+}
+
 const local = StyleSheet.create({
+  action: { fontSize: 14, textAlign: 'right', color: colors.accent, fontWeight: '600' },
   header: { alignItems: 'center', gap: space.sm },
   name: { fontSize: 28, fontWeight: '700', color: colors.ink, textAlign: 'center', letterSpacing: -0.4 },
   obituary: { ...cardStyle, padding: space.lg, gap: space.sm },

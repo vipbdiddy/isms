@@ -31,10 +31,13 @@ test('"Liked by" names you first, then a few others, then a count', () => {
 
 test('comments are deleted by their author or whoever shared the memory', () => {
   const comment: Comment = { id: 'c', authorId: 'bob', ismId: 'q', body: 'Hi', reviewStatus: 'ok', createdAt: 0 };
-  assert.equal(canDeleteComment(comment, 'bob', 'ann'), true);
-  assert.equal(canDeleteComment(comment, 'ann', 'ann'), true);
-  assert.equal(canDeleteComment(comment, 'cat', 'ann'), false);
-  assert.equal(canDeleteComment(comment, '', ''), false);
+  assert.equal(canDeleteComment(comment, 'bob', ['ann']), true);
+  assert.equal(canDeleteComment(comment, 'ann', ['ann']), true);
+  assert.equal(canDeleteComment(comment, 'cat', ['ann']), false);
+  assert.equal(canDeleteComment(comment, '', ['']), false);
+  // On something Dan added to Ann's loved one, both of them can.
+  assert.equal(canDeleteComment(comment, 'dan', ['dan', 'ann']), true);
+  assert.equal(canDeleteComment(comment, 'ann', ['dan', 'ann']), true);
 });
 
 test('names and profiles show for friends, groups and public profiles only', () => {

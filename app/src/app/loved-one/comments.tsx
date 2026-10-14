@@ -14,12 +14,12 @@ import { colors, space } from '../../lib/theme';
 /** Comments on a loved one: kind words and memories for their family. */
 export default function LovedOneComments() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getLovedOne, viewer, loading } = useStore();
+  const { getLovedOne, viewer, loaded } = useStore();
   const insets = useSafeAreaInsets();
   const lovedOne = getLovedOne(id);
 
   if (!lovedOne || !canSeeLovedOne(lovedOne, viewer)) {
-    return <Empty title={loading ? 'Loading…' : 'We couldn’t find this person.'} />;
+    return <Empty title={loaded ? 'We couldn’t find this person.' : 'Loading…'} />;
   }
   const target = { lovedOneId: lovedOne.id };
 
@@ -30,7 +30,7 @@ export default function LovedOneComments() {
         <LovedOneRow lovedOne={lovedOne} />
         <LikedBy target={target} />
         <Text style={styles.muted}>A kind word for their family, or a memory of {lovedOne.name}.</Text>
-        <CommentList target={target} memoryOwnerId={lovedOne.ownerId} />
+        <CommentList target={target} memoryOwnerIds={[lovedOne.ownerId]} />
       </ScrollView>
       <View style={[local.composer, { paddingBottom: space.md + insets.bottom }]}>
         <CommentComposer target={target} />

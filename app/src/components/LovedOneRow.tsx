@@ -28,8 +28,19 @@ export function sharedWithLabel(lovedOne: Pick<LovedOne, 'visibility'>, groupNam
 /**
  * A loved one in a list. The last line says how many memories they have (`count`) and who shared them.
  * In the feed, `at` says when they were added instead, and their likes and comments are counted.
+ * Tapping opens their page, unless `onPress` does something else.
  */
-export function LovedOneRow({ lovedOne, count, at }: { lovedOne: LovedOne; count?: number; at?: number }) {
+export function LovedOneRow({
+  lovedOne,
+  count,
+  at,
+  onPress,
+}: {
+  lovedOne: LovedOne;
+  count?: number;
+  at?: number;
+  onPress?: () => void;
+}) {
   const { userId, getGroup } = useStore();
   const mine = lovedOne.ownerId === userId;
   const example = lovedOne.ownerId === COMMUNITY_OWNER;
@@ -41,7 +52,7 @@ export function LovedOneRow({ lovedOne, count, at }: { lovedOne: LovedOne; count
   return (
     <Pressable
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.9 }]}
-      onPress={() => router.push({ pathname: '/loved-one/[id]', params: { id: lovedOne.id } })}>
+      onPress={onPress ?? (() => router.push({ pathname: '/loved-one/[id]', params: { id: lovedOne.id } }))}>
       <Avatar lovedOne={lovedOne} size={52} />
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={styles.name}>{lovedOne.name}</Text>

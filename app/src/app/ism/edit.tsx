@@ -1,12 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { Button, DangerButton, ErrorNote, Field, Segmented, TopicPicker, styles } from '../../components/ui';
-import { detectTopics } from '../../lib/advice';
+import { Button, DangerButton, Empty, ErrorNote, Field, Segmented, TopicPicker, styles } from '../../components/ui';
+import { canContribute, detectTopics } from '../../lib/advice';
 import { useStore } from '../../lib/store';
 import { colors } from '../../lib/theme';
-import type { EntryKind } from '../../lib/types';
+import type { EntryKind, Ism, LovedOne } from '../../lib/types';
 
 const KINDS = [
   ['quote', 'A quote'],
@@ -14,13 +14,44 @@ const KINDS = [
 ] as const;
 
 export default function EditIsm() {
-  const params = useLocalSearchParams<{ lovedOneId: string; id?: string; kind?: EntryKind }>();
-  const { lovedOneId, id } = params;
-  const { getLovedOne, getGroup, isms, addIsm, updateIsm, deleteIsm, userId } = useStore();
+  const { lovedOneId, id, kind } = useLocalSearchParams<{ lovedOneId: string; id?: string; kind?: EntryKind }>();
+  const { getLovedOne, isms, userId, viewer, loaded } = useStore();
   const lovedOne = getLovedOne(lovedOneId);
   const existing = id ? isms.find((i) => i.id === id) : undefined;
 
-  const [kind, setKind] = useState<EntryKind>(existing?.kind ?? (params.kind === 'story' ? 'story' : 'quote'));
+  if (!userId) {
+    return (
+      <Empty title="Sign in to add a quote or story.">
+        <Button title="Sign in or create an account" onPress={() => router.replace('/account')} />
+      </Empty>
+    );
+  }
+  // Opened from a link, or after the page reloaded, they may still be loading. The form starts from
+  // what's saved, so it waits for them.
+  if (!lovedOne || (id && !existing)) {
+    return (
+      <Empty title={!loaded ? 'Loading…' : lovedOne ? 'We couldn’t find this memory.' : 'We couldn’t find this person.'} />
+    );
+  }
+  if (existing ? existing.ownerId !== userId : !canContribute(lovedOne, viewer)) {
+    return <Empty title={`Only whoever added ${lovedOne.name} can add to their page right now.`} />;
+  }
+  return <IsmForm key={existing?.id ?? 'new'} lovedOne={lovedOne} existing={existing} startAs={kind} userId={userId} />;
+}
+
+function IsmForm({
+  lovedOne,
+  existing,
+  startAs,
+  userId,
+}: {
+  lovedOne: LovedOne;
+  existing?: Ism;
+  startAs?: EntryKind;
+  userId: string;
+}) {
+  const { getGroup, addIsm, updateIsm, deleteIsm } = useStore();
+  const [kind, setKind] = useState<EntryKind>(existing?.kind ?? (startAs === 'story' ? 'story' : 'quote'));
   const [title, setTitle] = useState(existing?.title ?? '');
   const [text, setText] = useState(existing?.text ?? '');
   const [context, setContext] = useState(existing?.context ?? '');
@@ -29,14 +60,16 @@ export default function EditIsm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
-  if (!lovedOne || lovedOne.ownerId !== userId || (existing && existing.ownerId !== userId)) return null;
+  // Adding to someone else's loved one.
+  const theirs = lovedOne.ownerId !== userId;
 
   // Until they pick topics themselves, suggest some from what they've typed.
   const story = kind === 'story';
   const suggested = topics.length === 0 ? detectTopics(`${story ? title : context} ${text}`) : [];
   const noun = story ? 'story' : 'quote';
-  const sharedWith =
-    lovedOne.visibility === 'friends'
+  const sharedWith = theirs
+    ? 'everyone who can see them'
+    : lovedOne.visibility === 'friends'
       ? 'your friends'
       : lovedOne.visibility === 'group'
         ? (getGroup(lovedOne.groupId ?? '')?.name ?? 'a group')
@@ -67,6 +100,12 @@ export default function EditIsm() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {theirs ? (
+        <Text style={[styles.hint, local.note]}>
+          You’re adding to {lovedOne.name}’s page. Your name shows with what you add, and whoever shared {lovedOne.name}{' '}
+          can remove it.
+        </Text>
+      ) : null}
       <Segmented options={KINDS} value={kind} onChange={setKind} />
       {story ? (
         <>
@@ -118,7 +157,7 @@ export default function EditIsm() {
             <Text style={styles.label}>Keep this one private</Text>
             <Text style={styles.hint}>
               {lovedOne.name} is shared with {sharedWith}. Turn this on
-              to keep just this {noun} to yourself. Shared memories that might hurt someone are checked by Ism’s before
+              to keep just this {noun} to yourself. Shared memories that might hurt someone are checked by Isms before
               others see them.
             </Text>
           </View>
@@ -152,3 +191,7 @@ export default function EditIsm() {
     </ScrollView>
   );
 }
+
+const local = StyleSheet.create({
+  note: { backgroundColor: colors.accentSoft, color: colors.accent, padding: 10, borderRadius: 10, fontSize: 13 },
+});
