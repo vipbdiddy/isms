@@ -24,10 +24,9 @@ export function KeyboardRoot({ children }: { children: ReactNode }) {
 }
 
 function EndAtKeyboard({ children }: { children: ReactNode }) {
-  // Behind the keyboard as it slides in, so it matches the screens.
-  return (
-    <View style={{ flex: 1, paddingBottom: useKeyboardHeight(), backgroundColor: colors.background }}>{children}</View>
-  );
+  const keyboardHeight = useKeyboardHeight();
+  // The background shows behind the keyboard as it slides in, so it matches the screens.
+  return <View style={{ flex: 1, paddingBottom: keyboardHeight, backgroundColor: colors.background }}>{children}</View>;
 }
 
 /**
@@ -39,6 +38,8 @@ function useKeyboardHeight(): number {
   useEffect(() => {
     const subscriptions = [
       KeyboardEvents.addListener('keyboardWillShow', (e) => setHeight(e.height)),
+      // Once it's open too, in case a phone says otherwise at first.
+      KeyboardEvents.addListener('keyboardDidShow', (e) => setHeight(e.height)),
       KeyboardEvents.addListener('keyboardWillHide', () => setHeight(0)),
       KeyboardEvents.addListener('keyboardDidHide', () => setHeight(0)),
     ];
