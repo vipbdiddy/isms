@@ -47,7 +47,20 @@ interface IsmRow {
   context: string | null;
   topics: string[];
   keep_private: boolean;
+  /** Missing on databases from before quotes and stories had their own sharing. */
+  visibility?: Visibility | null;
+  group_ids?: string[] | null;
   review_status: ReviewStatus;
+  created_at: string;
+}
+
+interface SeenThroughMemoriesRow {
+  id: string;
+  owner_id: string;
+  name: string;
+  relationship: string | null;
+  years: string | null;
+  photo_path: string | null;
   created_at: string;
 }
 
@@ -147,7 +160,23 @@ const toIsm = (r: IsmRow): Ism => ({
   context: orUndefined(r.context),
   topics: r.topics,
   keepPrivate: r.keep_private,
+  visibility: orUndefined(r.visibility ?? null),
+  groupIds: r.group_ids?.length ? r.group_ids : undefined,
   reviewStatus: r.review_status,
+  createdAt: Date.parse(r.created_at),
+});
+
+/** A loved one seen only through their quotes and stories shared with you: just whose they are. */
+const toLovedOneSeenThroughMemories = (r: SeenThroughMemoriesRow): LovedOne => ({
+  id: r.id,
+  ownerId: r.owner_id,
+  name: r.name,
+  relationship: r.relationship ?? '',
+  years: orUndefined(r.years),
+  photoPath: orUndefined(r.photo_path),
+  visibility: 'private',
+  allowContributions: false,
+  limited: true,
   createdAt: Date.parse(r.created_at),
 });
 
@@ -190,7 +219,15 @@ const ismColumns = (input: Partial<IsmInput>) => {
   if ('text' in input) row.text = input.text;
   if ('context' in input) row.context = input.context ?? null;
   if ('topics' in input) row.topics = input.topics;
-  if ('keepPrivate' in input) row.keep_private = input.keepPrivate ?? false;
+  // Who can see it: its own sharing (with "keep private" kept in step for older versions of the app),
+  // or missing for the same people as its loved one.
+  if ('visibility' in input) {
+    row.visibility = input.visibility ?? null;
+    row.keep_private = input.visibility === 'private';
+    row.group_ids = input.visibility === 'group' ? (input.groupIds ?? []) : [];
+  } else if ('keepPrivate' in input) {
+    row.keep_private = input.keepPrivate ?? false;
+  }
   return row;
 };
 
@@ -201,8 +238,10 @@ const none = Promise.resolve({ data: [], error: null });
  * the likes and comments on them.
  */
 export async function fetchAll(userId: string | null) {
-  const [lovedOnes, isms, saved, likes, comments] = await Promise.all([
+  const [lovedOnes, seenThroughMemories, isms, saved, likes, comments] = await Promise.all([
     supabase.from('loved_ones').select('*').order('created_at'),
+    // Loved ones you see only through their quotes and stories shared with you.
+    supabase.rpc('loved_ones_seen_through_memories'),
     supabase.from('isms').select('*').order('created_at', { ascending: false }),
     userId ? supabase.from('saved_isms').select('ism_id') : none,
     userId ? supabase.from('likes').select('user_id, ism_id, loved_one_id').order('created_at', { ascending: false }) : none,
@@ -215,8 +254,15 @@ export async function fetchAll(userId: string | null) {
   // Likes and comments are extras: if they can't load (say the database is a version behind), the memories still show.
   if (likes.error) console.warn('Could not load likes', likes.error);
   if (comments.error) console.warn('Could not load comments', comments.error);
+  // Like likes and comments, an extra: without it, those loved ones' quotes and stories just don't show.
+  if (seenThroughMemories.error) console.warn('Could not load loved ones seen through memories', seenThroughMemories.error);
+  const shared = (lovedOnes.data as LovedOneRow[]).map(toLovedOne);
+  const sharedIds = new Set(shared.map((l) => l.id));
+  const throughMemories = ((seenThroughMemories.data ?? []) as SeenThroughMemoriesRow[])
+    .map(toLovedOneSeenThroughMemories)
+    .filter((l) => !sharedIds.has(l.id));
   return {
-    lovedOnes: (lovedOnes.data as LovedOneRow[]).map(toLovedOne),
+    lovedOnes: [...shared, ...throughMemories],
     isms: (isms.data as IsmRow[]).map(toIsm),
     savedIsmIds: (saved.data as { ism_id: string }[]).map((r) => r.ism_id),
     likes: ((likes.data ?? []) as LikeRow[]).map(

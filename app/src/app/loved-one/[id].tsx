@@ -8,6 +8,7 @@ import { IsmCard } from '../../components/IsmCard';
 import { LikeButton, LikedBy } from '../../components/Reactions';
 import { ReportPanel, ReviewNote } from '../../components/ReportPanel';
 import { SharedBy, openGroup } from '../../components/SharedBy';
+import { postSharingLabel } from '../../components/SharingPicker';
 import { Button, Empty, ErrorNote, KindToggle, TextButton, styles } from '../../components/ui';
 import { canContribute, canSee, canSeeLovedOne, isShared, matchesKind } from '../../lib/advice';
 import { COMMUNITY_OWNER } from '../../lib/seed';
@@ -74,7 +75,9 @@ export default function LovedOneScreen() {
 
   const mine = lovedOne.ownerId === userId;
   const example = lovedOne.ownerId === COMMUNITY_OWNER;
-  const canReport = !!userId && !mine && !example;
+  // Seen only through quotes and stories shared with you: just those, and whose they are.
+  const limited = !!lovedOne.limited;
+  const canReport = !!userId && !mine && !example && !limited;
   const target = { lovedOneId: lovedOne.id };
   const comments = commentsOn(target).length;
   const group = lovedOne.groupId ? getGroup(lovedOne.groupId) : undefined;
@@ -112,12 +115,14 @@ export default function LovedOneScreen() {
           <Text style={[styles.muted, { textAlign: 'center' }]}>{ownStatus(lovedOne.visibility, group)}</Text>
         ) : example ? (
           <Text style={[styles.muted, { textAlign: 'center' }]}>An example.</Text>
+        ) : limited ? (
+          <Text style={[styles.muted, { textAlign: 'center' }]}>You’re seeing what’s been shared with you.</Text>
         ) : (
           <SharedBy lovedOne={lovedOne} after="." style={{ ...styles.muted, textAlign: 'center' }} />
         )}
         {canReport && !reporting ? <TextButton title="Report" color={colors.muted} onPress={() => setReporting(true)} /> : null}
       </View>
-      {example ? null : (
+      {example || limited ? null : (
         <View style={{ gap: space.xs }}>
           <View style={local.reactions}>
             <LikeButton target={target} />
@@ -180,7 +185,7 @@ export default function LovedOneScreen() {
         shown.map((ism) => (
           <View key={ism.id} style={{ gap: 4 }}>
             <IsmCard ism={ism} showAuthor={false} showCredit={ism.ownerId !== lovedOne.ownerId} />
-            <MemoryActions ism={ism} lovedOneOwnerId={lovedOne.ownerId} shared={lovedOne.visibility !== 'private'} />
+            <MemoryActions ism={ism} lovedOneOwnerId={lovedOne.ownerId} />
           </View>
         ))
       )}
@@ -201,16 +206,18 @@ export default function LovedOneScreen() {
 }
 
 /** Under a quote or story: Edit for whoever added it; Remove for whoever added the loved one. */
-function MemoryActions({ ism, lovedOneOwnerId, shared }: { ism: Ism; lovedOneOwnerId: string; shared: boolean }) {
-  const { userId, deleteIsm } = useStore();
+function MemoryActions({ ism, lovedOneOwnerId }: { ism: Ism; lovedOneOwnerId: string }) {
+  const { userId, deleteIsm, getGroup } = useStore();
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string>();
   if (ism.ownerId === userId) {
+    // Who can see it, when that's not the same as its loved one.
+    const sharing = postSharingLabel(ism, (id) => getGroup(id)?.name);
     return (
       <Text
         style={local.action}
         onPress={() => router.push({ pathname: '/ism/edit', params: { lovedOneId: ism.lovedOneId, id: ism.id } })}>
-        {ism.keepPrivate && shared ? 'Private · ' : ''}Edit
+        {sharing ? `${sharing} · ` : ''}Edit
       </Text>
     );
   }

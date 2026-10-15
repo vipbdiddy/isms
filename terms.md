@@ -6,7 +6,7 @@ By using Isms, you agree to these terms.
 
 ## Your content
 
-You own the isms, stories, photos, notes and comments you save. You give Isms permission to store them and show them to you so the app can work. If you choose to share a loved one with your friends, a group or everyone, you also give Isms permission to show what you shared to those people, until you stop sharing it. When you comment on something, or add an ism or story to someone else's loved one, you give Isms permission to show it, with your name, to everyone who can see what you added it to, until you or whoever shared that loved one removes it. Please only save and share content you have the right to share.
+You own the isms, stories, photos, notes and comments you save. You give Isms permission to store them and show them to you so the app can work. If you choose to share a loved one, an ism or a story with your friends, one or more groups or everyone, you also give Isms permission to show what you shared to those people, until you stop sharing it. When you comment on something, or add an ism or story to someone else's loved one, you give Isms permission to show it, with your name, to everyone who can see what you added it to, until you or whoever shared that loved one removes it. Please only save and share content you have the right to share.
 
 ## Sharing kindly
 

@@ -219,3 +219,52 @@ test("the loved ones to pick from when adding a memory: yours, your friends' and
   );
   assert.deepEqual(lovedOnesToAddTo(all, mine, signedOut), []);
 });
+
+test('a quote or story can be shared on its own: just me, friends, groups or everyone', () => {
+  const aunt = lovedOne('aunt', ME, 'friends');
+  const grandma = lovedOne('grandma', ME, 'private');
+  const friend: Viewer = { userId: FRIEND, friendIds: new Set([ME]), groupIds: new Set() };
+  const cousin: Viewer = { userId: COUSIN, friendIds: new Set(), groupIds: new Set([FAMILY]) };
+  const same = ism('same', 'aunt', ME, []);
+  const everyone = ism('everyone', 'aunt', ME, [], 'x', { visibility: 'public' });
+  const justMe = ism('justMe', 'aunt', ME, [], 'x', { visibility: 'private', keepPrivate: true });
+  const friends = ism('friends', 'grandma', ME, [], 'x', { visibility: 'friends' });
+  const groups = ism('groups', 'grandma', ME, [], 'x', { visibility: 'group', groupIds: ['book-club', FAMILY] });
+  // Left alone, like its loved one.
+  assert.equal(canSee(same, aunt, friend), true);
+  assert.equal(canSee(same, aunt, stranger), false);
+  // Shared more widely than its loved one.
+  assert.equal(canSee(everyone, aunt, stranger), true);
+  assert.equal(canSee(everyone, aunt, signedOut), true);
+  // Or less.
+  assert.equal(canSee(justMe, aunt, friend), false);
+  assert.equal(canSee(justMe, aunt, me), true);
+  // Friends and groups, on a loved one only I can see.
+  assert.equal(canSee(friends, grandma, friend), true);
+  assert.equal(canSee(friends, grandma, cousin), false);
+  assert.equal(canSee(groups, grandma, cousin), true);
+  assert.equal(canSee(groups, grandma, friend), false);
+});
+
+test('a loved one seen only through a shared quote: whose it is, and nothing more', () => {
+  const card = { ...lovedOne('card', 'other', 'private'), limited: true };
+  const quote = ism('q', 'card', 'other', [], 'x', { visibility: 'public' });
+  const alike = ism('alike', 'card', 'other', []);
+  assert.equal(canSeeLovedOne(card, stranger), true);
+  assert.equal(canContribute(card, stranger), false);
+  assert.deepEqual(visibleIsms([quote, alike], [card], stranger, 'everyone').map((i) => i.id), ['q']);
+  // The quote is in the feed; the loved one doesn't appear on their own.
+  assert.deepEqual(feed([quote], [card], stranger, 'everyone').map((f) => f.id), ['ism-q']);
+});
+
+test('the friends scope has what friends add, and what is shared with your groups', () => {
+  const strangers = lovedOne('strangers', 'other', 'public');
+  const inMyGroup = ism('g', 'strangers', 'other', [], 'x', { visibility: 'group', groupIds: [FAMILY] });
+  const byFriend = ism('f', 'strangers', FRIEND, []);
+  const other = ism('o', 'strangers', 'other', []);
+  const shown = (scope: 'mine' | 'friends' | 'everyone') =>
+    visibleIsms([inMyGroup, byFriend, other], [strangers], me, scope).map((i) => i.id);
+  assert.deepEqual(shown('mine'), []);
+  assert.deepEqual(shown('friends'), ['g', 'f']);
+  assert.deepEqual(shown('everyone'), ['g', 'f', 'o']);
+});

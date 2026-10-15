@@ -84,12 +84,18 @@ export default function GroupScreen() {
     () => lovedOnes.filter((l) => l.visibility === 'group' && l.groupId === id && canSeeLovedOne(l, viewer)),
     [lovedOnes, id, viewer],
   );
+  // About the loved ones shared with the group, or shared with the group on their own.
   const latest = useMemo(() => {
-    const byId = new Map(shared.map((l) => [l.id, l]));
+    const sharedIds = new Set(shared.map((l) => l.id));
+    const byId = new Map(lovedOnes.map((l) => [l.id, l]));
     return isms
-      .filter((i) => byId.has(i.lovedOneId) && canSee(i, byId.get(i.lovedOneId), viewer))
+      .filter(
+        (i) =>
+          (sharedIds.has(i.lovedOneId) || (i.visibility === 'group' && (i.groupIds ?? []).includes(id))) &&
+          canSee(i, byId.get(i.lovedOneId), viewer),
+      )
       .sort((a, b) => b.createdAt - a.createdAt);
-  }, [shared, isms, viewer]);
+  }, [shared, lovedOnes, isms, viewer, id]);
 
   const term = query.trim();
   useEffect(() => {
@@ -280,8 +286,8 @@ export default function GroupScreen() {
         onPress={() => router.push({ pathname: '/loved-one/edit', params: { groupId: group.id } })}
       />
       <Text style={styles.hint}>
-        To share someone you already added, open them, tap Edit, and choose {group.name} under “Who can see their
-        memories?”.
+        To share someone you already added, open them, tap Edit, and choose {group.name} under “Who can see them?”.
+        Or share a single quote or story with the group when you add it.
       </Text>
 
       {latest.length > 0 ? (

@@ -2,11 +2,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
+import { PostSharingPicker } from '../../components/SharingPicker';
 import { Button, DangerButton, Empty, ErrorNote, Field, Segmented, TopicPicker, styles } from '../../components/ui';
-import { canContribute, detectTopics } from '../../lib/advice';
+import { canContribute, detectTopics, sameSharingAsLovedOne } from '../../lib/advice';
 import { useStore } from '../../lib/store';
 import { colors } from '../../lib/theme';
-import type { EntryKind, Ism, LovedOne } from '../../lib/types';
+import type { EntryKind, Ism, LovedOne, Visibility } from '../../lib/types';
 
 const KINDS = [
   ['quote', 'A quote'],
@@ -50,13 +51,23 @@ function IsmForm({
   startAs?: EntryKind;
   userId: string;
 }) {
-  const { getGroup, addIsm, updateIsm, deleteIsm } = useStore();
+  const { addIsm, updateIsm, deleteIsm } = useStore();
   const [kind, setKind] = useState<EntryKind>(existing?.kind ?? (startAs === 'story' ? 'story' : 'quote'));
   const [title, setTitle] = useState(existing?.title ?? '');
   const [text, setText] = useState(existing?.text ?? '');
   const [context, setContext] = useState(existing?.context ?? '');
   const [topics, setTopics] = useState<string[]>(existing?.topics ?? []);
+  // Someone else's addition can only be kept private, or be seen like its loved one.
   const [keepPrivate, setKeepPrivate] = useState(existing?.keepPrivate ?? false);
+  // Your own loved one's: who can see it, starting with whoever can see them.
+  const [sharing, setSharing] = useState<{ visibility: Visibility; groupIds: string[] }>(() => {
+    const own = existing?.visibility ?? (existing?.keepPrivate ? 'private' : undefined);
+    if (own) return { visibility: own, groupIds: own === 'group' ? (existing?.groupIds ?? []) : [] };
+    return {
+      visibility: lovedOne.visibility,
+      groupIds: lovedOne.visibility === 'group' && lovedOne.groupId ? [lovedOne.groupId] : [],
+    };
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -67,13 +78,16 @@ function IsmForm({
   const story = kind === 'story';
   const suggested = topics.length === 0 ? detectTopics(`${story ? title : context} ${text}`) : [];
   const noun = story ? 'story' : 'quote';
-  const sharedWith = theirs
-    ? 'everyone who can see them'
-    : lovedOne.visibility === 'friends'
-      ? 'your friends'
-      : lovedOne.visibility === 'group'
-        ? (getGroup(lovedOne.groupId ?? '')?.name ?? 'a group')
-        : 'everyone';
+  // Shared the same as its loved one, it just follows them: if who can see them changes, so does this.
+  const sameAsLovedOne = !theirs && sameSharingAsLovedOne(lovedOne, sharing.visibility, sharing.groupIds);
+  const sharingFields = theirs
+    ? { visibility: keepPrivate ? ('private' as const) : undefined, groupIds: [], keepPrivate }
+    : {
+        visibility: sameAsLovedOne ? undefined : sharing.visibility,
+        groupIds: sameAsLovedOne ? [] : sharing.groupIds,
+        keepPrivate: !sameAsLovedOne && sharing.visibility === 'private',
+      };
+  const noGroupPicked = !theirs && sharing.visibility === 'group' && sharing.groupIds.length === 0;
 
   const save = async () => {
     const fields = {
@@ -83,7 +97,7 @@ function IsmForm({
       text: text.trim(),
       context: story ? undefined : context.trim() || undefined,
       topics: topics.length ? topics : suggested,
-      keepPrivate,
+      ...sharingFields,
     };
     setSaving(true);
     setError(undefined);
@@ -151,14 +165,13 @@ function IsmForm({
       />
       {suggested.length > 0 && <Text style={styles.hint}>We guessed these from the words — tap to change.</Text>}
 
-      {lovedOne.visibility !== 'private' && (
+      {theirs ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Keep this one private</Text>
             <Text style={styles.hint}>
-              {lovedOne.name} is shared with {sharedWith}. Turn this on
-              to keep just this {noun} to yourself. Shared memories that might hurt someone are checked by Isms before
-              others see them.
+              Everyone who can see {lovedOne.name} can see what you add. Turn this on to keep just this {noun} to
+              yourself. Shared memories that might hurt someone are checked by Isms before others see them.
             </Text>
           </View>
           <Switch
@@ -166,12 +179,25 @@ function IsmForm({
             onValueChange={setKeepPrivate}
             trackColor={{ true: colors.accent, false: colors.border }}
             thumbColor={colors.card}
+            accessibilityLabel="Keep this one private"
           />
         </View>
+      ) : (
+        <PostSharingPicker
+          lovedOne={lovedOne}
+          noun={noun}
+          visibility={sharing.visibility}
+          groupIds={sharing.groupIds}
+          onChange={(visibility, groupIds) => setSharing({ visibility, groupIds })}
+        />
       )}
 
       {error ? <ErrorNote message={error} /> : null}
-      <Button title={saving ? 'Saving…' : existing ? 'Save' : 'Add'} onPress={save} disabled={!text.trim() || saving} />
+      <Button
+        title={saving ? 'Saving…' : existing ? 'Save' : 'Add'}
+        onPress={save}
+        disabled={!text.trim() || saving || noGroupPicked}
+      />
       {existing && (
         <DangerButton
           title="Delete"
