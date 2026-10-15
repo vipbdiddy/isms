@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentComposer, CommentList } from '../../components/Comments';
 import { IsmCard } from '../../components/IsmCard';
-import { KeyboardAware } from '../../components/KeyboardAware';
+import { KeyboardAware, useKeyboardShown } from '../../components/KeyboardAware';
 import { LikedBy } from '../../components/Reactions';
 import { Empty, styles } from '../../components/ui';
 import { canSee } from '../../lib/advice';
@@ -17,6 +17,7 @@ export default function IsmScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isms, getLovedOne, viewer, loaded } = useStore();
   const insets = useSafeAreaInsets();
+  const keyboardShown = useKeyboardShown();
   const ism = isms.find((i) => i.id === id);
   const lovedOne = ism ? getLovedOne(ism.lovedOneId) : undefined;
 
@@ -44,7 +45,8 @@ export default function IsmScreen() {
         <Text style={styles.subheading}>Comments</Text>
         <CommentList target={target} memoryOwnerIds={lovedOne ? [ism.ownerId, lovedOne.ownerId] : [ism.ownerId]} />
       </ScrollView>
-      <View style={[local.composer, { paddingBottom: space.md + insets.bottom }]}>
+      {/* Above the keyboard, there's no navigation bar to keep clear of. */}
+      <View style={[local.composer, { paddingBottom: space.md + (keyboardShown ? 0 : insets.bottom) }]}>
         <CommentComposer target={target} />
       </View>
     </KeyboardAware>

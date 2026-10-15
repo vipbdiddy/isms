@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import { Switch, Text, View } from 'react-native';
 
+import { KeyboardScroll } from '../components/KeyboardAware';
 import { NameField } from '../components/NameField';
 import { Button, DangerButton, ErrorNote, ScopeToggle, styles } from '../components/ui';
 import { deleteAccount, signOut } from '../lib/auth';
@@ -16,7 +17,7 @@ export default function SettingsScreen() {
   const [error, setError] = useState<string>();
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll style={styles.screen} contentContainerStyle={styles.content}>
       {isAdmin && (
         <>
           <Text style={styles.subheading}>Reviewing</Text>
@@ -145,6 +146,6 @@ export default function SettingsScreen() {
           />
         </>
       )}
-    </ScrollView>
+    </KeyboardScroll>
   );
 }

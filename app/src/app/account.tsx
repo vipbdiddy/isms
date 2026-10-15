@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { KeyboardScroll } from '../components/KeyboardAware';
 import { Button, ErrorNote, Field, styles } from '../components/ui';
 import {
   friendlyAuthError,
@@ -80,7 +81,7 @@ export default function Account() {
   const canSubmit = cleanEmail.includes('@') && (mode === 'forgot' || password.length >= 6);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.heading}>{TITLES[mode]}</Text>
 
       {entering && (
@@ -189,7 +190,7 @@ export default function Account() {
           </Text>
         )}
       </View>
-    </ScrollView>
+    </KeyboardScroll>
   );
 }
 

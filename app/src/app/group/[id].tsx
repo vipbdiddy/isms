@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { IsmCard } from '../../components/IsmCard';
+import { KeyboardScroll } from '../../components/KeyboardAware';
 import { LovedOneRow } from '../../components/LovedOneRow';
 import { PersonRow } from '../../components/PersonRow';
 import { Button, Card, DangerButton, Empty, ErrorNote, Field, TextButton, styles } from '../../components/ui';
@@ -213,10 +214,9 @@ export default function GroupScreen() {
   };
 
   return (
-    <ScrollView
+    <KeyboardScroll
       style={styles.screen}
       contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
       refreshControl={refreshControl}>
       <Stack.Screen options={{ title: group.name }} />
       {renaming ? (
@@ -392,7 +392,7 @@ export default function GroupScreen() {
           />
         )}
       </View>
-    </ScrollView>
+    </KeyboardScroll>
   );
 }
 

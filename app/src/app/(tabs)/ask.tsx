@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import { IsmCard } from '../../components/IsmCard';
+import { KeyboardScroll } from '../../components/KeyboardAware';
 import { Empty, Field, KindToggle, ScopeToggle, TopicPicker, styles } from '../../components/ui';
 import { detectTopics, findAdvice, matchesKind, visibleIsms } from '../../lib/advice';
 import { useStore } from '../../lib/store';
@@ -41,7 +42,7 @@ export default function Ask() {
   const asked = situation.trim().length > 0 || picked.length > 0;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll style={styles.screen} contentContainerStyle={styles.content}>
       <Field
         label="What are you going through?"
         placeholder="e.g. I'm nervous about starting a new job"
@@ -72,6 +73,6 @@ export default function Ask() {
       {matches.map(({ ism }) => (
         <IsmCard key={ism.id} ism={ism} />
       ))}
-    </ScrollView>
+    </KeyboardScroll>
   );
 }

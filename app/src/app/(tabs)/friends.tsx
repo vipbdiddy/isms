@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { KeyboardScroll } from '../../components/KeyboardAware';
 import { NameField } from '../../components/NameField';
 import { PersonRow, mutualFriendsNote } from '../../components/PersonRow';
 import { openGroup } from '../../components/SharedBy';
@@ -116,13 +117,13 @@ export default function Friends() {
 
   if (!profile.displayName.trim()) {
     return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardScroll style={styles.screen} contentContainerStyle={styles.content}>
         <Text style={styles.heading}>First, what should friends call you?</Text>
         <Text style={styles.body}>
           This is how people find you and see you when you add them, and next to the memories you share.
         </Text>
         <NameField label="Your name" />
-      </ScrollView>
+      </KeyboardScroll>
     );
   }
 
@@ -216,10 +217,9 @@ export default function Friends() {
   };
 
   return (
-    <ScrollView
+    <KeyboardScroll
       style={styles.screen}
       contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
       refreshControl={refreshControl}>
       {editingName ? (
         <NameField onSaved={() => setEditingName(false)} />
@@ -409,7 +409,7 @@ export default function Friends() {
       <NewGroup />
 
       <Button title="Invite someone to Isms" icon="share-outline" variant="secondary" onPress={invite} />
-    </ScrollView>
+    </KeyboardScroll>
   );
 }
 

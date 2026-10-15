@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentComposer, CommentList } from '../../components/Comments';
-import { KeyboardAware } from '../../components/KeyboardAware';
+import { KeyboardAware, useKeyboardShown } from '../../components/KeyboardAware';
 import { LovedOneRow } from '../../components/LovedOneRow';
 import { LikedBy } from '../../components/Reactions';
 import { Empty, styles } from '../../components/ui';
@@ -16,6 +16,7 @@ export default function LovedOneComments() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getLovedOne, viewer, loaded } = useStore();
   const insets = useSafeAreaInsets();
+  const keyboardShown = useKeyboardShown();
   const lovedOne = getLovedOne(id);
 
   if (!lovedOne || !canSeeLovedOne(lovedOne, viewer)) {
@@ -32,7 +33,8 @@ export default function LovedOneComments() {
         <Text style={styles.muted}>A kind word for their family, or a memory of {lovedOne.name}.</Text>
         <CommentList target={target} memoryOwnerIds={[lovedOne.ownerId]} />
       </ScrollView>
-      <View style={[local.composer, { paddingBottom: space.md + insets.bottom }]}>
+      {/* Above the keyboard, there's no navigation bar to keep clear of. */}
+      <View style={[local.composer, { paddingBottom: space.md + (keyboardShown ? 0 : insets.bottom) }]}>
         <CommentComposer target={target} />
       </View>
     </KeyboardAware>
