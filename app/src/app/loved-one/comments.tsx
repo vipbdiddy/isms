@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentComposer, CommentList } from '../../components/Comments';
-import { KeyboardAware, useKeyboardShown } from '../../components/KeyboardAware';
+import { useKeyboardShown } from '../../components/KeyboardAware';
 import { LovedOneRow } from '../../components/LovedOneRow';
 import { LikedBy } from '../../components/Reactions';
 import { Empty, styles } from '../../components/ui';
@@ -25,7 +25,7 @@ export default function LovedOneComments() {
   const target = { lovedOneId: lovedOne.id };
 
   return (
-    <KeyboardAware>
+    <View style={{ flex: 1 }}>
       <Stack.Screen options={{ title: 'Comments' }} />
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <LovedOneRow lovedOne={lovedOne} />
@@ -37,7 +37,7 @@ export default function LovedOneComments() {
       <View style={[local.composer, { paddingBottom: space.md + (keyboardShown ? 0 : insets.bottom) }]}>
         <CommentComposer target={target} />
       </View>
-    </KeyboardAware>
+    </View>
   );
 }
 

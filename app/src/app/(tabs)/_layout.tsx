@@ -49,6 +49,8 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: colors.muted,
         // A little taller than the default, so the labels have room; the phone's own bottom edge comes on top.
         tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border, height: 60 + insets.bottom, paddingTop: 6 },
+        // More room for what you're typing, while the keyboard is up.
+        tabBarHideOnKeyboard: true,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarBadgeStyle: { backgroundColor: colors.accent, color: '#fff' },
       }}>
