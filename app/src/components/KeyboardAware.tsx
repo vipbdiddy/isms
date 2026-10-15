@@ -1,48 +1,59 @@
-import type { ReactNode } from 'react';
-import type { ScrollViewProps } from 'react-native';
-import {
-  KeyboardAvoidingView,
-  KeyboardAwareScrollView,
-  KeyboardProvider,
-  useKeyboardState,
-} from 'react-native-keyboard-controller';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ScrollView, View, type ScrollViewProps } from 'react-native';
+import { KeyboardController, KeyboardEvents, KeyboardProvider } from 'react-native-keyboard-controller';
+
+import { colors } from '../lib/theme';
 
 // Keeping what you're typing above the keyboard on phones. Browsers do it themselves, so the web
 // version (KeyboardAware.web.tsx) is plain.
 
 /**
- * Around the whole app. On Android the app draws behind the status and navigation bars, which the
- * keyboard library is told, so it doesn't make room for them a second time.
+ * Around the whole app. Android apps now draw behind the status and navigation bars (the keyboard
+ * library is told so), so the screen no longer gets shorter when the keyboard opens, and anything at
+ * the bottom ended up behind it. Instead the app ends where the keyboard begins, on every screen: a
+ * box at the bottom, like the comment box, sits just above the keyboard, and a scrolling screen brings
+ * the box you're typing in into view (Android does that when a scroll view gets shorter, and keeps the
+ * line you're on in view as you type).
  */
 export function KeyboardRoot({ children }: { children: ReactNode }) {
   return (
     <KeyboardProvider statusBarTranslucent navigationBarTranslucent preserveEdgeToEdge>
-      {children}
+      <EndAtKeyboard>{children}</EndAtKeyboard>
     </KeyboardProvider>
   );
 }
 
-/** How far above the keyboard the line you're typing on stays. */
-const ABOVE_KEYBOARD = 32;
-
-/**
- * A screen of text boxes that scrolls: the box you're typing in moves up above the keyboard, and keeps
- * the line you're on in view as it grows.
- */
-export function KeyboardScroll(props: ScrollViewProps) {
-  return <KeyboardAwareScrollView bottomOffset={ABOVE_KEYBOARD} keyboardShouldPersistTaps="handled" {...props} />;
+function EndAtKeyboard({ children }: { children: ReactNode }) {
+  const keyboardHeight = useKeyboardHeight();
+  // The background shows behind the keyboard as it slides in, so it matches the screens.
+  return <View style={{ flex: 1, paddingBottom: keyboardHeight, backgroundColor: colors.background }}>{children}</View>;
 }
 
-/** A full-screen area whose bottom (like a comment box) stays above the keyboard. */
-export function KeyboardAware({ children }: { children: ReactNode }) {
-  return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" automaticOffset>
-      {children}
-    </KeyboardAvoidingView>
-  );
+/**
+ * How much of the screen the keyboard covers, from the bottom edge: its full height as soon as it
+ * starts to open (or changes size, like switching to emoji), and 0 as soon as it starts to close.
+ */
+function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(() => (KeyboardController.isVisible() ? KeyboardController.state().height : 0));
+  useEffect(() => {
+    const subscriptions = [
+      KeyboardEvents.addListener('keyboardWillShow', (e) => setHeight(e.height)),
+      // Once it's open too, in case a phone says otherwise at first.
+      KeyboardEvents.addListener('keyboardDidShow', (e) => setHeight(e.height)),
+      KeyboardEvents.addListener('keyboardWillHide', () => setHeight(0)),
+      KeyboardEvents.addListener('keyboardDidHide', () => setHeight(0)),
+    ];
+    return () => subscriptions.forEach((s) => s.remove());
+  }, []);
+  return height;
+}
+
+/** A scrolling screen with text boxes. Taps on buttons work while the keyboard is up. */
+export function KeyboardScroll(props: ScrollViewProps) {
+  return <ScrollView keyboardShouldPersistTaps="handled" {...props} />;
 }
 
 /** Whether the keyboard is showing. */
 export function useKeyboardShown(): boolean {
-  return useKeyboardState((state) => state.isVisible);
+  return useKeyboardHeight() > 0;
 }

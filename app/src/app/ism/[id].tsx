@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentComposer, CommentList } from '../../components/Comments';
 import { IsmCard } from '../../components/IsmCard';
-import { KeyboardAware, useKeyboardShown } from '../../components/KeyboardAware';
+import { useKeyboardShown } from '../../components/KeyboardAware';
 import { LikedBy } from '../../components/Reactions';
 import { Empty, styles } from '../../components/ui';
 import { canSee } from '../../lib/advice';
@@ -37,7 +37,7 @@ export default function IsmScreen() {
   }
 
   return (
-    <KeyboardAware>
+    <View style={{ flex: 1 }}>
       <Stack.Screen options={{ title: lovedOne?.name ?? '' }} />
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <IsmCard ism={ism} showTime inPost />
@@ -49,7 +49,7 @@ export default function IsmScreen() {
       <View style={[local.composer, { paddingBottom: space.md + (keyboardShown ? 0 : insets.bottom) }]}>
         <CommentComposer target={target} />
       </View>
-    </KeyboardAware>
+    </View>
   );
 }
 
