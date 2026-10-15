@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, Text } from 'react-native';
 
+import { KeyboardScroll } from '../components/KeyboardAware';
 import { Button, ErrorNote, Field, styles } from '../components/ui';
 import { friendlyAuthError, setNewPassword } from '../lib/auth';
 import { colors } from '../lib/theme';
@@ -48,7 +49,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.heading}>{saved ? 'Password changed' : 'Choose a new password'}</Text>
       {saved ? (
         <>
@@ -75,6 +76,6 @@ export default function ResetPassword() {
           />
         </>
       )}
-    </ScrollView>
+    </KeyboardScroll>
   );
 }

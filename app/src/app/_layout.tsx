@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 
+import { KeyboardRoot } from '../components/KeyboardAware';
 import { StoreProvider, useStore } from '../lib/store';
 import { colors } from '../lib/theme';
 
@@ -48,9 +49,11 @@ function Root() {
 
 export default function RootLayout() {
   return (
-    <StoreProvider>
-      <StatusBar style="dark" />
-      <Root />
-    </StoreProvider>
+    <KeyboardRoot>
+      <StoreProvider>
+        <StatusBar style="dark" />
+        <Root />
+      </StoreProvider>
+    </KeyboardRoot>
   );
 }

@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 
+import { KeyboardScroll } from '../../components/KeyboardAware';
 import { PostSharingPicker } from '../../components/SharingPicker';
 import { Button, DangerButton, Empty, ErrorNote, Field, Segmented, TopicPicker, styles } from '../../components/ui';
 import { canContribute, detectTopics, sameSharingAsLovedOne } from '../../lib/advice';
@@ -113,7 +114,7 @@ function IsmForm({
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll style={styles.screen} contentContainerStyle={styles.content}>
       {theirs ? (
         <Text style={[styles.hint, local.note]}>
           You’re adding to {lovedOne.name}’s page. Your name shows with what you add, and whoever shared {lovedOne.name}{' '}
@@ -214,7 +215,7 @@ function IsmForm({
           }}
         />
       )}
-    </ScrollView>
+    </KeyboardScroll>
   );
 }
 

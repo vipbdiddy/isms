@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Avatar } from '../../components/Avatar';
+import { KeyboardScroll } from '../../components/KeyboardAware';
 import { sharedWithLabel } from '../../components/LovedOneRow';
 import { SharingPicker } from '../../components/SharingPicker';
 import { Button, DangerButton, Empty, ErrorNote, Field, TextButton, styles } from '../../components/ui';
@@ -98,7 +99,7 @@ function LovedOneForm({ existing, forGroup, userId }: { existing?: LovedOne; for
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardScroll style={styles.screen} contentContainerStyle={styles.content}>
       <View style={{ alignItems: 'center', gap: 8 }}>
         <Pressable onPress={choosePhoto} accessibilityRole="button" accessibilityLabel="Choose a photo">
           <Avatar lovedOne={{ name: name || '?', photoUri }} size={112} />
@@ -191,7 +192,7 @@ function LovedOneForm({ existing, forGroup, userId }: { existing?: LovedOne; for
           }}
         />
       )}
-    </ScrollView>
+    </KeyboardScroll>
   );
 }
 
