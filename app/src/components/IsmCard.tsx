@@ -14,6 +14,7 @@ import { Avatar } from './Avatar';
 import { CommentButton, LikeButton } from './Reactions';
 import { ReportPanel, ReviewNote } from './ReportPanel';
 import { SharedBy } from './SharedBy';
+import { toggleName } from './ui';
 
 /** Stories longer than this start collapsed. */
 const PREVIEW_CHARS = 280;
@@ -141,7 +142,8 @@ export function IsmCard({
           style={styles.icon}
           accessibilityRole="button"
           accessibilityState={{ selected: saved }}
-          accessibilityLabel={saved ? 'Remove from saved' : 'Save'}>
+          aria-pressed={saved}
+          accessibilityLabel={toggleName(saved, 'Save', 'Remove from saved')}>
           <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={21} color={saved ? colors.accent : colors.muted} />
         </Pressable>
       </View>
