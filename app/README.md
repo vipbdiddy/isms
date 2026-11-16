@@ -24,6 +24,9 @@ npx expo start      # then scan the QR code with Expo Go, or press w for web
 npm test            # advice-matching and privacy rules
 npm run typecheck
 
+# The database's own rules, on a local PostgreSQL (how to point it at one is at the top of the script)
+supabase/tests/run.sh
+
 # The web version, as published at https://vipbdiddy.github.io/isms/app/
 ISMS_WEB_BASE_URL=/isms/app npx expo export --platform web
 ```
@@ -51,7 +54,7 @@ Expo (React Native) + Expo Router, TypeScript.
 | `src/lib/topics.ts` | Situations and the words that suggest them |
 | `src/lib/store.tsx` | App state, loaded from and saved to Supabase |
 | `src/lib/db.ts`, `src/lib/auth.ts` | Talking to Supabase: data, sign-in |
-| `supabase/` | Database setup script and dashboard steps ([setup guide](supabase/README.md)) |
+| `supabase/` | Database setup script, tests of its rules, and dashboard steps ([setup guide](supabase/README.md)) |
 | `public/` | The web version's page, home-screen icons and manifest (paths assume `/isms/app/`) |
 | `assets/` | The logo (`logo.svg`: the Illustrator file `isms_logo_teal.ai` with its background removed), its halo and swoosh for the "Why Isms" card, and the app icons, launch screen and browser icon made from it |
 | `src/components/Logo.tsx` | The logo, as shown in Home's header |
