@@ -23,6 +23,15 @@ alter table public.loved_ones drop constraint if exists loved_ones_visibility_ch
 alter table public.loved_ones add constraint loved_ones_visibility_check
   check (visibility in ('private', 'friends', 'group', 'public'));
 
+-- A loved one's photo has to be one its owner uploaded: a file in their own folder of the bucket.
+-- Otherwise someone could point a loved one of theirs at another person's photo, and so see it or
+-- show it to others. Anything that already points elsewhere loses its photo.
+update public.loved_ones set photo_path = null
+where photo_path is not null and not starts_with(photo_path, owner_id::text || '/');
+alter table public.loved_ones drop constraint if exists loved_ones_photo_is_owners;
+alter table public.loved_ones add constraint loved_ones_photo_is_owners
+  check (photo_path is null or starts_with(photo_path, owner_id::text || '/'));
+
 create index if not exists loved_ones_owner_idx on public.loved_ones (owner_id);
 create index if not exists loved_ones_public_idx on public.loved_ones (visibility) where visibility = 'public';
 
@@ -1615,7 +1624,8 @@ create policy "remove own comments or comments on own memories" on public.commen
 
 -- Photos ------------------------------------------------------------------------------
 -- A private bucket: the app asks for short-lived links, and only for photos the person may see.
--- Each person uploads into a folder named after their user id.
+-- Each person uploads into a folder named after their user id. A loved one only ever opens a photo
+-- from its own owner's folder, whatever it points at (see loved_ones_photo_is_owners above).
 
 insert into storage.buckets (id, name, public)
 values ('photos', 'photos', false)
@@ -1631,11 +1641,14 @@ create policy "read own or shared photos" on storage.objects
       or exists (
         select 1 from public.loved_ones l
         where l.photo_path = storage.objects.name
+          and (storage.foldername(storage.objects.name))[1] = l.owner_id::text
           and l.review_status in ('ok', 'approved')
           and public.is_shared_with_me(l.visibility, l.owner_id, l.group_id)
       )
       or exists (
-        select 1 from public.loved_ones_seen_through_memories() s where s.photo_path = storage.objects.name
+        select 1 from public.loved_ones_seen_through_memories() s
+        where s.photo_path = storage.objects.name
+          and (storage.foldername(storage.objects.name))[1] = s.owner_id::text
       )
     )
   );
