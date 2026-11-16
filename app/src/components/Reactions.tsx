@@ -7,6 +7,7 @@ import { useStore } from '../lib/store';
 import { colors, space } from '../lib/theme';
 import type { Target } from '../lib/types';
 import { openPerson } from './SharedBy';
+import { toggleName } from './ui';
 
 /** The heart: like a quote, story or loved one, with how many people did. */
 export function LikeButton({ target }: { target: Target }) {
@@ -22,7 +23,8 @@ export function LikeButton({ target }: { target: Target }) {
       style={styles.action}
       accessibilityRole="button"
       accessibilityState={{ selected: liked }}
-      accessibilityLabel={`${liked ? 'Unlike' : 'Like'}${count ? `, ${count} ${count === 1 ? 'like' : 'likes'}` : ''}`}>
+      aria-pressed={liked}
+      accessibilityLabel={`${toggleName(liked, 'Like', 'Unlike')}${count ? `, ${count} ${count === 1 ? 'like' : 'likes'}` : ''}`}>
       <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={liked ? colors.heart : colors.muted} />
       <Text style={[styles.count, liked && { color: colors.heart }]}>{shortCount(count)}</Text>
     </Pressable>

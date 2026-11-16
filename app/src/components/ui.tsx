@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +19,15 @@ import type { KindFilter, Scope } from '../lib/types';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
+/**
+ * What screen readers call a button that turns something on and off, like a like or a save. Browsers say
+ * whether it's pressed, so there its name stays the same ("Like, pressed"). On phones its name says what
+ * tapping it will do ("Unlike").
+ */
+export function toggleName(on: boolean, name: string, nameToTurnOff: string): string {
+  return on && Platform.OS !== 'web' ? nameToTurnOff : name;
+}
+
 export function Chip({
   label,
   selected,
@@ -34,7 +44,9 @@ export function Chip({
       onPress={onPress}
       onLayout={onLayout}
       accessibilityRole="button"
+      // Whether it's on, for screen readers: phones are told it's selected, browsers that it's pressed.
       accessibilityState={{ selected }}
+      aria-pressed={selected}
       style={[styles.chip, selected && styles.chipSelected]}>
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </Pressable>
@@ -134,7 +146,7 @@ export function Segmented<T extends string>({
           key={option}
           onPress={() => onChange(option)}
           accessibilityRole="tab"
-          accessibilityState={{ selected: value === option }}
+          aria-selected={value === option}
           style={[styles.segmentItem, value === option && styles.segmentItemActive]}>
           <Text style={[styles.segmentText, value === option && styles.segmentTextActive]}>{label}</Text>
         </Pressable>
