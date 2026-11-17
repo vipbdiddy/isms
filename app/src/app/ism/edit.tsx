@@ -126,6 +126,11 @@ function IsmForm({
   // Pictures shared with everyone get a look from Isms first (see set_review_status in the database).
   const reachesEveryone = (sharingFields.visibility ?? lovedOne.visibility) === 'public';
 
+  // Once it's saved or deleted, back to where they came from. Opened from a link, or after the page reloaded,
+  // there's nowhere to go back to, so open the loved one's page rather than leave the form sitting there.
+  const close = () =>
+    router.canGoBack() ? router.back() : router.replace({ pathname: '/loved-one/[id]', params: { id: lovedOne.id } });
+
   const save = async () => {
     const fields = {
       kind,
@@ -141,7 +146,7 @@ function IsmForm({
     try {
       if (existing) await updateIsm(existing.id, fields, picture);
       else await addIsm(fields, picture ?? undefined);
-      router.back();
+      close();
     } catch (e) {
       console.warn('Could not save', e);
       setError('Couldn’t save. Check your connection and try again.');
@@ -269,7 +274,7 @@ function IsmForm({
           onConfirm={async () => {
             try {
               await deleteIsm(existing.id);
-              router.back();
+              close();
             } catch (e) {
               console.warn('Could not delete', e);
               setError('Couldn’t delete. Check your connection and try again.');

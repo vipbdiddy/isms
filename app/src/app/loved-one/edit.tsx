@@ -86,7 +86,10 @@ function LovedOneForm({ existing, forGroup, userId }: { existing?: LovedOne; for
     try {
       if (existing) {
         await updateLovedOne(existing.id, fields, photo);
-        router.back();
+        // Back to where they came from. Opened from a link, or after the page reloaded, there's nowhere to go
+        // back to, so open their page rather than leave the form sitting there.
+        if (router.canGoBack()) router.back();
+        else router.replace({ pathname: '/loved-one/[id]', params: { id: existing.id } });
       } else {
         const created = await addLovedOne(fields, photo ?? undefined);
         router.replace({ pathname: '/loved-one/[id]', params: { id: created.id } });
@@ -184,7 +187,9 @@ function LovedOneForm({ existing, forGroup, userId }: { existing?: LovedOne; for
           onConfirm={async () => {
             try {
               await deleteLovedOne(existing.id);
-              router.dismissAll();
+              // Their page is gone too, so close everything opened over the tabs and show the Loved ones tab.
+              // Opened from a link, or after the page reloaded, there may be no tabs underneath: then it opens them.
+              router.dismissTo('/people');
             } catch (e) {
               console.warn('Could not remove loved one', e);
               setError('Couldn’t remove them. Check your connection and try again.');
