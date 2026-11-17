@@ -66,6 +66,26 @@ alter table public.isms add constraint isms_visibility_check
   check (visibility is null or visibility in ('private', 'friends', 'group', 'public'));
 create index if not exists isms_group_ids_idx on public.isms using gin (group_ids);
 
+-- A picture with a quote or story: a JPEG in its author's own folder of the photos bucket, with its size
+-- in pixels so the app can make room for it before it loads. Anything that points elsewhere loses its
+-- picture (see loved_ones_photo_is_owners, for loved ones' photos).
+alter table public.isms add column if not exists picture_path text;
+alter table public.isms add column if not exists picture_width int;
+alter table public.isms add column if not exists picture_height int;
+update public.isms set picture_path = null, picture_width = null, picture_height = null
+where picture_path is not null and not starts_with(picture_path, owner_id::text || '/');
+alter table public.isms drop constraint if exists isms_picture_is_owners;
+alter table public.isms add constraint isms_picture_is_owners
+  check (picture_path is null or starts_with(picture_path, owner_id::text || '/'));
+alter table public.isms drop constraint if exists isms_picture_size;
+alter table public.isms add constraint isms_picture_size check (
+  case
+    when picture_path is null then picture_width is null and picture_height is null
+    else coalesce(picture_width between 1 and 20000 and picture_height between 1 and 20000, false)
+  end
+);
+create index if not exists isms_picture_path_idx on public.isms (picture_path) where picture_path is not null;
+
 -- Saved (♥) quotes and stories, per person -------------------------------------
 
 create table if not exists public.saved_isms (
@@ -894,21 +914,41 @@ alter table public.loved_ones drop constraint if exists loved_ones_review_status
 alter table public.loved_ones add constraint loved_ones_review_status_check
   check (review_status in ('ok', 'pending', 'approved', 'removed'));
 
--- Checks the words whenever they're added or changed. Only a reviewer (review_content) changes the
--- status otherwise, and the app can't write the column at all (see the grants below).
+-- Whether a quote or story reaches everyone: by its own sharing, or else like its loved one.
+create or replace function public.reaches_everyone(ism_visibility text, loved_one uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(ism_visibility, (select l.visibility from public.loved_ones l where l.id = loved_one)) = 'public';
+$$;
+
+revoke all on function public.reaches_everyone(text, uuid) from public, anon, authenticated;
+
+-- Checks the words whenever they're added or changed. A picture shared with everyone waits for a
+-- reviewer too, as the words check can't look at it: when it's added or changed, and when who can see
+-- it widens to everyone (unless a reviewer already allowed it). Only a reviewer (review_content)
+-- changes the status otherwise, and the app can't write the column at all (see the grants below).
 create or replace function public.set_review_status()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 declare
   words text;
   old_words text;
+  public_picture boolean := false;
+  picture_changed boolean := false;
 begin
   if tg_table_name = 'isms' then
     words := concat_ws(' ', new.title, new.text, new.context);
+    public_picture := new.picture_path is not null and public.reaches_everyone(new.visibility, new.loved_one_id);
     if tg_op = 'UPDATE' then
       old_words := concat_ws(' ', old.title, old.text, old.context);
+      picture_changed := new.picture_path is distinct from old.picture_path;
     end if;
   elsif tg_table_name = 'comments' then
     words := new.body;
@@ -923,7 +963,11 @@ begin
   end if;
 
   if tg_op = 'UPDATE' then
-    if words is not distinct from old_words then
+    if words is not distinct from old_words and not picture_changed then
+      -- Only who can see it may have changed.
+      if public_picture and new.review_status = 'ok' then
+        new.review_status := 'pending';
+      end if;
       return new;
     end if;
     -- Something a reviewer removed stays removed, even when it's edited.
@@ -933,15 +977,48 @@ begin
     end if;
   end if;
 
-  new.review_status := case when public.might_be_hurtful(words) then 'pending' else 'ok' end;
+  new.review_status := case
+    when public.might_be_hurtful(words) then 'pending'
+    -- A picture shared with everyone, unless it's the one a reviewer already allowed.
+    when public_picture and not picture_changed and tg_op = 'UPDATE' and old.review_status = 'approved' then 'approved'
+    when public_picture then 'pending'
+    else 'ok'
+  end;
   return new;
 end;
 $$;
 
+-- Named to run after isms_sharing (triggers run in name order), so it sees who a quote or story is
+-- really shared with once that's been tidied.
 drop trigger if exists isms_review_status on public.isms;
-create trigger isms_review_status
+drop trigger if exists isms_zz_review_status on public.isms;
+create trigger isms_zz_review_status
   before insert or update on public.isms
   for each row execute function public.set_review_status();
+
+-- When a loved one comes to be shared with everyone, the pictures on their quotes and stories that are
+-- shared like them reach everyone too, so they wait for a reviewer (set_review_status decides).
+create or replace function public.hold_pictures_shared_wider()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.visibility = 'public' and old.visibility is distinct from 'public' then
+    update public.isms set review_status = 'pending'
+    where loved_one_id = new.id and visibility is null and picture_path is not null and review_status = 'ok';
+  end if;
+  return null;
+end;
+$$;
+
+revoke all on function public.hold_pictures_shared_wider() from public, anon, authenticated;
+
+drop trigger if exists loved_ones_hold_pictures on public.loved_ones;
+create trigger loved_ones_hold_pictures
+  after update of visibility on public.loved_ones
+  for each row execute function public.hold_pictures_shared_wider();
 
 drop trigger if exists loved_ones_review_status on public.loved_ones;
 create trigger loved_ones_review_status
@@ -955,7 +1032,8 @@ create trigger comments_review_status
 
 -- People can change everything about their own quotes, stories and loved ones except the review status.
 revoke update on public.isms from anon, authenticated;
-grant update (loved_one_id, kind, title, text, context, topics, keep_private, visibility, group_ids) on public.isms
+grant update (loved_one_id, kind, title, text, context, topics, keep_private, visibility, group_ids,
+  picture_path, picture_width, picture_height) on public.isms
   to authenticated;
 revoke update on public.loved_ones from anon, authenticated;
 grant update (name, relationship, years, about, obituary, photo_path, visibility, group_id, allow_contributions) on public.loved_ones
@@ -1272,6 +1350,8 @@ $$;
 
 -- What's waiting for a reviewer: held memories and comments that are shared, and anything shared that's
 -- been reported. For a comment, `context` is the quote or story it's on (empty when it's on a loved one).
+-- For a quote or story, `picture_path` is its picture, if it has one.
+drop function if exists public.content_to_review();
 create or replace function public.content_to_review()
 returns table (
   item_kind text,
@@ -1286,7 +1366,8 @@ returns table (
   review_status text,
   report_count int,
   reasons text[],
-  created_at timestamptz
+  created_at timestamptz,
+  picture_path text
 )
 language sql
 stable
@@ -1299,7 +1380,7 @@ as $$
       l.visibility, i.review_status,
       (select count(*)::int from public.reports r where r.ism_id = i.id and r.resolved_at is null),
       array(select r.reason from public.reports r where r.ism_id = i.id and r.resolved_at is null and r.reason <> ''),
-      i.created_at
+      i.created_at, i.picture_path
     from public.isms i
     join public.loved_ones l on l.id = i.loved_one_id
     left join public.profiles p on p.id = i.owner_id
@@ -1317,7 +1398,7 @@ as $$
       l.visibility, l.review_status,
       (select count(*)::int from public.reports r where r.loved_one_id = l.id and r.resolved_at is null),
       array(select r.reason from public.reports r where r.loved_one_id = l.id and r.resolved_at is null and r.reason <> ''),
-      l.created_at
+      l.created_at, null::text
     from public.loved_ones l
     left join public.profiles p on p.id = l.owner_id
     where public.is_admin()
@@ -1333,7 +1414,7 @@ as $$
       l.visibility, c.review_status,
       (select count(*)::int from public.reports r where r.comment_id = c.id and r.resolved_at is null),
       array(select r.reason from public.reports r where r.comment_id = c.id and r.resolved_at is null and r.reason <> ''),
-      c.created_at
+      c.created_at, null::text
     from public.comments c
     left join public.isms i on i.id = c.ism_id
     join public.loved_ones l on l.id = coalesce(c.loved_one_id, i.loved_one_id)
@@ -1374,6 +1455,27 @@ begin
   end if;
 end;
 $$;
+
+-- Whether a picture is on a quote or story waiting for a reviewer, and the person asking is one.
+create or replace function public.picture_to_review(path text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.is_admin() and exists (
+    select 1 from public.isms i
+    where i.picture_path = path
+      and (
+        i.review_status = 'pending'
+        or exists (select 1 from public.reports r where r.ism_id = i.id and r.resolved_at is null)
+      )
+  );
+$$;
+
+revoke all on function public.picture_to_review(text) from public;
+grant execute on function public.picture_to_review(text) to anon, authenticated;
 
 revoke all on function public.is_admin() from public, anon;
 revoke all on function public.report_content(uuid, uuid, text) from public, anon;
@@ -1625,11 +1727,16 @@ create policy "remove own comments or comments on own memories" on public.commen
 -- Photos ------------------------------------------------------------------------------
 -- A private bucket: the app asks for short-lived links, and only for photos the person may see.
 -- Each person uploads into a folder named after their user id. A loved one only ever opens a photo
--- from its own owner's folder, whatever it points at (see loved_ones_photo_is_owners above).
+-- from its own owner's folder, whatever it points at (see loved_ones_photo_is_owners above), and a
+-- quote or story a picture from its author's. The bucket also holds the pictures with quotes and
+-- stories, which go to whoever can see them.
 
 insert into storage.buckets (id, name, public)
 values ('photos', 'photos', false)
 on conflict (id) do nothing;
+
+-- The app makes every photo and picture a smaller JPEG before saving it, so nothing else is stored.
+update storage.buckets set file_size_limit = 10485760, allowed_mime_types = '{image/jpeg}' where id = 'photos';
 
 drop policy if exists "read own or shared photos" on storage.objects;
 create policy "read own or shared photos" on storage.objects
@@ -1650,6 +1757,14 @@ create policy "read own or shared photos" on storage.objects
         where s.photo_path = storage.objects.name
           and (storage.foldername(storage.objects.name))[1] = s.owner_id::text
       )
+      -- A picture with a quote or story, to whoever can see it: the rules for quotes and stories apply to
+      -- this lookup too, so this is exactly the people they show to.
+      or exists (
+        select 1 from public.isms i
+        where i.picture_path = storage.objects.name
+          and (storage.foldername(storage.objects.name))[1] = i.owner_id::text
+      )
+      or public.picture_to_review(storage.objects.name)
     )
   );
 

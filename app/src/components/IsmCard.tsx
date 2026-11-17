@@ -11,6 +11,7 @@ import { timeAgo } from '../lib/time';
 import { topicLabel } from '../lib/topics';
 import type { Ism } from '../lib/types';
 import { Avatar } from './Avatar';
+import { Picture } from './Picture';
 import { CommentButton, LikeButton } from './Reactions';
 import { ReportPanel, ReviewNote } from './ReportPanel';
 import { SharedBy } from './SharedBy';
@@ -21,6 +22,9 @@ const PREVIEW_CHARS = 280;
 
 /** Opens a quote or story on its own, with its comments. */
 export const openIsm = (id: string) => router.push({ pathname: '/ism/[id]', params: { id } });
+
+/** Shows a quote's or story's picture full size. */
+export const openPicture = (id: string) => router.push({ pathname: '/picture', params: { id } });
 
 /**
  * A quote or story. `showTime` adds when it was shared, for the feed; `showAuthor` false hides whose it
@@ -90,6 +94,15 @@ export function IsmCard({
           {ism.context ? <Text style={styles.context}>{ism.context}</Text> : null}
         </>
       )}
+      {ism.pictureUri ? (
+        <Picture
+          uri={ism.pictureUri}
+          width={ism.pictureWidth}
+          height={ism.pictureHeight}
+          label={story ? 'Picture with this story' : 'Picture with this quote'}
+          onPress={() => openPicture(ism.id)}
+        />
+      ) : null}
       <View style={styles.footer}>
         {showAuthor && lovedOne ? <Avatar lovedOne={lovedOne} size={36} /> : null}
         <View style={{ flex: 1, gap: 2 }}>

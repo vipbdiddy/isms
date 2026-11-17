@@ -16,6 +16,7 @@ import type {
   Profile,
   ReviewItem,
   ReviewStatus,
+  SavedPicture,
   Target,
   Visibility,
 } from './types';
@@ -50,6 +51,10 @@ interface IsmRow {
   /** Missing on databases from before quotes and stories had their own sharing. */
   visibility?: Visibility | null;
   group_ids?: string[] | null;
+  /** Missing on databases from before quotes and stories had pictures. */
+  picture_path?: string | null;
+  picture_width?: number | null;
+  picture_height?: number | null;
   review_status: ReviewStatus;
   created_at: string;
 }
@@ -123,6 +128,7 @@ interface ReviewRow {
   report_count: number;
   reasons: string[];
   created_at: string;
+  picture_path?: string | null;
 }
 
 interface FriendshipRow {
@@ -162,6 +168,9 @@ const toIsm = (r: IsmRow): Ism => ({
   keepPrivate: r.keep_private,
   visibility: orUndefined(r.visibility ?? null),
   groupIds: r.group_ids?.length ? r.group_ids : undefined,
+  picturePath: orUndefined(r.picture_path ?? null),
+  pictureWidth: orUndefined(r.picture_width ?? null),
+  pictureHeight: orUndefined(r.picture_height ?? null),
   reviewStatus: r.review_status,
   createdAt: Date.parse(r.created_at),
 });
@@ -211,7 +220,7 @@ const lovedOneColumns = (input: Partial<LovedOneInput> & { photoPath?: string | 
   return row;
 };
 
-const ismColumns = (input: Partial<IsmInput>) => {
+const ismColumns = (input: Partial<IsmInput> & { picture?: SavedPicture | null }) => {
   const row: Partial<IsmRow> = {};
   if ('lovedOneId' in input) row.loved_one_id = input.lovedOneId;
   if ('kind' in input) row.kind = input.kind;
@@ -227,6 +236,11 @@ const ismColumns = (input: Partial<IsmInput>) => {
     row.group_ids = input.visibility === 'group' ? (input.groupIds ?? []) : [];
   } else if ('keepPrivate' in input) {
     row.keep_private = input.keepPrivate ?? false;
+  }
+  if ('picture' in input) {
+    row.picture_path = input.picture?.path ?? null;
+    row.picture_width = input.picture?.width ?? null;
+    row.picture_height = input.picture?.height ?? null;
   }
   return row;
 };
@@ -289,13 +303,13 @@ export async function removeLovedOne(id: string) {
   if (error) throw error;
 }
 
-export async function insertIsm(input: IsmInput) {
+export async function insertIsm(input: IsmInput & { picture?: SavedPicture }) {
   const { data, error } = await supabase.from('isms').insert(ismColumns(input)).select().single();
   if (error) throw error;
   return toIsm(data as IsmRow);
 }
 
-export async function patchIsm(id: string, patch: Partial<IsmInput>) {
+export async function patchIsm(id: string, patch: Partial<IsmInput> & { picture?: SavedPicture | null }) {
   const { data, error } = await supabase.from('isms').update(ismColumns(patch)).eq('id', id).select().single();
   if (error) throw error;
   return toIsm(data as IsmRow);
@@ -450,6 +464,7 @@ export async function contentToReview(): Promise<ReviewItem[]> {
     reportCount: r.report_count,
     reasons: r.reasons,
     createdAt: Date.parse(r.created_at),
+    picturePath: orUndefined(r.picture_path ?? null),
   }));
 }
 
