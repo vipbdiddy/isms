@@ -7,7 +7,7 @@ This policy explains what information Isms collects, how it is used, and who can
 ## What we collect
 
 - **Your account.** If you sign in with Google, we receive your name, email address and profile picture from Google. If you sign up with an email address, we store that address and a protected (hashed) version of your password.
-- **What you add about your loved ones.** Their names, relationships, years, short descriptions, obituaries and photos, and the isms (quotes) and stories you save, along with the topics you tag them with.
+- **What you add about your loved ones.** Their names, relationships, years, short descriptions, obituaries and photos, and the isms (quotes) and stories you save, with the topics you tag them with and any picture you add to one.
 - **Your saved favorites.** Which isms and stories you have saved (the bookmark).
 - **Your name and friends.** The name you choose for other people to see (if you sign in with Google, it starts as your Google name), whether people may find you, whether your profile is public, and who you are friends with or have sent or received friend requests from.
 - **Your groups.** The groups you make or join, who is in them, and the invitations you send, receive or decline.
@@ -27,7 +27,7 @@ For each loved one, you choose who can see their name, relationship, years, desc
 - **A group**: you and the members of one group you choose, like your family.
 - **Everyone**: everyone who uses Isms, including people who are not signed in.
 
-Their isms and stories are seen by the same people, unless you choose differently for one: just you, your friends, one or more of your groups, or everyone. If you share an ism or story with people who can't see its loved one, they also see the loved one's name, relationship, years and photo with it, but not their description or obituary. You can change who can see a loved one, or any ism or story, at any time, which takes effect right away.
+Their isms and stories, and any picture with one, are seen by the same people, unless you choose differently for one: just you, your friends, one or more of your groups, or everyone. If you share an ism or story with people who can't see its loved one, they also see the loved one's name, relationship, years and photo with it, but not their description or obituary. You can change who can see a loved one, or any ism or story, at any time, which takes effect right away.
 
 **Adding to someone else's loved one.** Unless the person who added a loved one turns it off, everyone who can see that loved one can add their own isms and stories to them. What you add is seen by everyone who can see the loved one, with your name, unless you keep it private; you can't share it with anyone else. The person who added the loved one can remove it. If they delete the loved one, everything added to them is deleted too.
 
@@ -39,7 +39,7 @@ Their isms and stories are seen by the same people, unless you choose differentl
 
 **Your profile** lists the loved ones, isms and stories you share with whoever is looking. Your friends and the people in your groups can open it, and see your name on what you share. Everyone else sees "Shared by their family" on what you share with everyone, and can't open your profile, unless you turn on **Settings (⚙) → Public profile**: then anyone signed in who can see something you shared also sees your name on it, and can open your profile. Either way, your name shows with your own comments and likes, including any you leave on your own loved ones. Your email address is never shown to other people.
 
-**Keeping shared memories kind.** Shared isms, stories, loved ones and comments whose words might hurt, accuse or embarrass someone are held until a reviewer at Isms looks at them, and so is anything three people report. Until then, only the person who wrote it can see it. Reviewers can read what is held or reported so they can decide whether to allow or remove it. They never see anything you keep to yourself.
+**Keeping shared memories kind.** Shared isms, stories, loved ones and comments whose words might hurt, accuse or embarrass someone are held until a reviewer at Isms looks at them, and so is an ism or story with a picture that is shared with everyone, and anything three people report. Until then, only the person who wrote it can see it. Reviewers can read what is held or reported, and see its picture, so they can decide whether to allow or remove it. They never see anything you keep to yourself.
 
 ## How we use it
 
@@ -49,11 +49,11 @@ Our use of information received from Google APIs follows the Google API Services
 
 ## Where it is stored
 
-Your information is stored with Supabase, the database, file storage and sign-in service Isms runs on. Photos are kept in private storage and shown through short-lived links.
+Your information is stored with Supabase, the database, file storage and sign-in service Isms runs on. Photos and pictures are made smaller before they are saved, kept in private storage, and shown through short-lived links.
 
 ## Deleting your data
 
-You can delete your account at any time in the app: **Settings (⚙) → Delete my account**. This permanently deletes your account, your name and friend list, the groups you made, your likes, comments and reports, and every loved one, photo, ism and story you added, including the ones you added to other people's loved ones. Loved ones other people shared with a group you made become private again for them. You can also ask us to delete your account by emailing vipbdiddy@gmail.com.
+You can delete your account at any time in the app: **Settings (⚙) → Delete my account**. This permanently deletes your account, your name and friend list, the groups you made, your likes, comments and reports, and every loved one, photo, picture, ism and story you added, including the ones you added to other people's loved ones. Loved ones other people shared with a group you made become private again for them. You can also ask us to delete your account by emailing vipbdiddy@gmail.com.
 
 ## Changes
 

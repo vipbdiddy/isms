@@ -3,11 +3,23 @@ import { useState } from 'react';
 import { StyleSheet, Switch, Text, View } from 'react-native';
 
 import { KeyboardScroll } from '../../components/KeyboardAware';
+import { Picture } from '../../components/Picture';
 import { PostSharingPicker } from '../../components/SharingPicker';
-import { Button, DangerButton, Empty, ErrorNote, Field, Segmented, TopicPicker, styles } from '../../components/ui';
+import {
+  Button,
+  DangerButton,
+  Empty,
+  ErrorNote,
+  Field,
+  Segmented,
+  TextButton,
+  TopicPicker,
+  styles,
+} from '../../components/ui';
 import { canContribute, detectTopics, sameSharingAsLovedOne } from '../../lib/advice';
+import { pickPicture, type PickedPhoto } from '../../lib/photos';
 import { useStore } from '../../lib/store';
-import { colors } from '../../lib/theme';
+import { colors, space } from '../../lib/theme';
 import type { EntryKind, Ism, LovedOne, Visibility } from '../../lib/types';
 
 const KINDS = [
@@ -69,11 +81,33 @@ function IsmForm({
       groupIds: lovedOne.visibility === 'group' && lovedOne.groupId ? [lovedOne.groupId] : [],
     };
   });
+  // undefined: keep the picture it has (if any); null: take it off; a PickedPhoto: a new one.
+  const [picture, setPicture] = useState<PickedPhoto | null>();
+  const [gettingPicture, setGettingPicture] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
   // Adding to someone else's loved one.
   const theirs = lovedOne.ownerId !== userId;
+
+  const shownPicture = picture
+    ? { uri: picture.previewUri, width: picture.width, height: picture.height }
+    : picture === undefined && existing?.pictureUri
+      ? { uri: existing.pictureUri, width: existing.pictureWidth, height: existing.pictureHeight }
+      : undefined;
+  const choosePicture = async () => {
+    if (gettingPicture) return;
+    setError(undefined);
+    setGettingPicture(true);
+    try {
+      const picked = await pickPicture();
+      if (picked) setPicture(picked);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t use that picture. Try another one.');
+    } finally {
+      setGettingPicture(false);
+    }
+  };
 
   // Until they pick topics themselves, suggest some from what they've typed.
   const story = kind === 'story';
@@ -89,6 +123,8 @@ function IsmForm({
         keepPrivate: !sameAsLovedOne && sharing.visibility === 'private',
       };
   const noGroupPicked = !theirs && sharing.visibility === 'group' && sharing.groupIds.length === 0;
+  // Pictures shared with everyone get a look from Isms first (see set_review_status in the database).
+  const reachesEveryone = (sharingFields.visibility ?? lovedOne.visibility) === 'public';
 
   const save = async () => {
     const fields = {
@@ -103,8 +139,8 @@ function IsmForm({
     setSaving(true);
     setError(undefined);
     try {
-      if (existing) await updateIsm(existing.id, fields);
-      else await addIsm(fields);
+      if (existing) await updateIsm(existing.id, fields, picture);
+      else await addIsm(fields, picture ?? undefined);
       router.back();
     } catch (e) {
       console.warn('Could not save', e);
@@ -155,6 +191,32 @@ function IsmForm({
         </>
       )}
 
+      <View style={{ gap: space.sm }}>
+        <Text style={styles.label}>A picture (optional)</Text>
+        {shownPicture ? (
+          <>
+            <Picture {...shownPicture} label="The picture you chose" />
+            <View style={{ flexDirection: 'row', gap: space.lg }}>
+              <TextButton title="Change picture" onPress={choosePicture} />
+              <TextButton title="Remove picture" onPress={() => setPicture(null)} />
+            </View>
+            {reachesEveryone ? (
+              <Text style={styles.hint}>
+                Pictures shared with everyone get a quick look from Isms before others can see them.
+              </Text>
+            ) : null}
+          </>
+        ) : (
+          <Button
+            title={gettingPicture ? 'Getting it ready…' : 'Add a picture'}
+            icon="image-outline"
+            variant="secondary"
+            onPress={choosePicture}
+            disabled={gettingPicture}
+          />
+        )}
+      </View>
+
       <Text style={styles.label}>When would this help someone?</Text>
       <TopicPicker
         wrap
@@ -197,7 +259,7 @@ function IsmForm({
       <Button
         title={saving ? 'Saving…' : existing ? 'Save' : 'Add'}
         onPress={save}
-        disabled={!text.trim() || saving || noGroupPicked}
+        disabled={!text.trim() || saving || noGroupPicked || gettingPicture}
       />
       {existing && (
         <DangerButton

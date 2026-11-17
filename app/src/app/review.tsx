@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { Picture } from '../components/Picture';
 import { Button, Empty, ErrorNote, styles } from '../components/ui';
 import { useStore } from '../lib/store';
 import { cardStyle, colors, radius, space } from '../lib/theme';
@@ -65,7 +66,8 @@ export default function ReviewScreen() {
       refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.accent} />}>
       <Text style={styles.muted}>
         These are shared with friends, a group or everyone, and only whoever wrote them can see them until you decide.
-        Allow anything kind or harmless. Remove anything that could hurt, accuse or embarrass someone, even if it’s true.
+        Allow anything kind or harmless. Remove anything that could hurt, accuse or embarrass someone, even if it’s true,
+        and any picture that isn’t right for everyone to see.
       </Text>
       {error ? <ErrorNote message={error} /> : null}
       {items?.length === 0 ? (
@@ -84,13 +86,16 @@ export default function ReviewScreen() {
               {item.kind === 'comment' ? `On: “${item.context}”` : item.context}
             </Text>
           ) : null}
+          {item.pictureUri ? <Picture uri={item.pictureUri} label="Its picture" /> : null}
           <View style={local.why}>
             <Ionicons name={item.reportCount ? 'flag-outline' : 'search-outline'} size={16} color={colors.danger} />
             <Text style={local.whyText}>
               {item.reportCount
                 ? `Reported by ${item.reportCount} ${item.reportCount === 1 ? 'person' : 'people'}` +
                   (item.reasons.length ? `: ${[...new Set(item.reasons)].join(', ')}` : '')
-                : 'Held because some of its words can be hurtful'}
+                : item.picturePath
+                  ? 'Held because its picture is shared with everyone, or some of its words can be hurtful'
+                  : 'Held because some of its words can be hurtful'}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: space.sm }}>

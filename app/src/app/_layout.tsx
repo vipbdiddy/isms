@@ -36,6 +36,10 @@ function Root() {
       <Stack.Screen name="choose" options={{ presentation: 'modal', title: 'Who is it about?' }} />
       <Stack.Screen name="ism/edit" options={{ presentation: 'modal', title: 'Add a memory' }} />
       <Stack.Screen name="ism/[id]" options={{ title: '' }} />
+      <Stack.Screen
+        name="picture"
+        options={{ presentation: 'fullScreenModal', animation: 'fade', headerShown: false, contentStyle: { backgroundColor: '#000' } }}
+      />
       <Stack.Screen name="person/[id]" options={{ title: '' }} />
       <Stack.Screen name="group/[id]" options={{ title: '' }} />
       <Stack.Screen name="account" options={{ presentation: 'modal', title: 'Account' }} />

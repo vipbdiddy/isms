@@ -6,11 +6,11 @@ By using Isms, you agree to these terms.
 
 ## Your content
 
-You own the isms, stories, photos, notes and comments you save. You give Isms permission to store them and show them to you so the app can work. If you choose to share a loved one, an ism or a story with your friends, one or more groups or everyone, you also give Isms permission to show what you shared to those people, until you stop sharing it. When you comment on something, or add an ism or story to someone else's loved one, you give Isms permission to show it, with your name, to everyone who can see what you added it to, until you or whoever shared that loved one removes it. Please only save and share content you have the right to share.
+You own the isms, stories, photos, pictures, notes and comments you save. You give Isms permission to store them and show them to you so the app can work. If you choose to share a loved one, an ism or a story with your friends, one or more groups or everyone, you also give Isms permission to show what you shared to those people, until you stop sharing it. When you comment on something, or add an ism or story to someone else's loved one, you give Isms permission to show it, with your name, to everyone who can see what you added it to, until you or whoever shared that loved one removes it. Please only save and share content you have the right to share.
 
 ## Sharing kindly
 
-Isms is for remembering people with love. Do not share or say anything that could hurt, accuse or embarrass someone, living or not, even if it is true. Shared isms, stories, loved ones and comments that might be hurtful are held until a reviewer at Isms looks at them, and anyone can report something they think breaks this rule. Whoever shared a loved one, ism or story can delete comments on it. We may hold, hide or remove anything that is shared, and suspend accounts that keep breaking it.
+Isms is for remembering people with love. Do not share or say anything that could hurt, accuse or embarrass someone, living or not, even if it is true, and only share pictures that are right for the people you share them with. Shared isms, stories, loved ones and comments that might be hurtful are held until a reviewer at Isms looks at them, as are isms and stories with a picture that are shared with everyone, and anyone can report something they think breaks this rule. Whoever shared a loved one, ism or story can delete comments on it. We may hold, hide or remove anything that is shared, and suspend accounts that keep breaking it.
 
 ## Acceptable use
 

@@ -73,6 +73,11 @@ export interface Ism {
   visibility?: Visibility;
   /** The groups it's shared with, when `visibility` is 'group'. */
   groupIds?: string[];
+  /** A picture with it: where it's stored, a link the app can show it from, and its size in pixels. */
+  picturePath?: string;
+  pictureUri?: string;
+  pictureWidth?: number;
+  pictureHeight?: number;
   reviewStatus?: ReviewStatus;
   createdAt: number;
 }
@@ -80,7 +85,17 @@ export interface Ism {
 /** The fields a person fills in for a loved one. */
 export type LovedOneInput = Omit<LovedOne, 'id' | 'ownerId' | 'createdAt' | 'photoPath' | 'photoUri' | 'reviewStatus'>;
 /** The fields a person fills in for a quote or story. */
-export type IsmInput = Omit<Ism, 'id' | 'ownerId' | 'createdAt' | 'reviewStatus'>;
+/** A picture saved for a quote or story: where it's stored, and its size in pixels. */
+export interface SavedPicture {
+  path: string;
+  width: number;
+  height: number;
+}
+
+export type IsmInput = Omit<
+  Ism,
+  'id' | 'ownerId' | 'createdAt' | 'reviewStatus' | 'picturePath' | 'pictureUri' | 'pictureWidth' | 'pictureHeight'
+>;
 
 export interface Settings {
   displayName: string;
@@ -183,4 +198,7 @@ export interface ReviewItem {
   reportCount: number;
   reasons: string[];
   createdAt: number;
+  /** A quote's or story's picture, if it has one: where it's stored, and a link to show it from. */
+  picturePath?: string;
+  pictureUri?: string;
 }

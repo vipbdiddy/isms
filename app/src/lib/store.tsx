@@ -7,7 +7,7 @@ import type { Viewer } from './advice';
 import * as db from './db';
 import { contactEmailHashes } from './contacts';
 import { moveDeviceDataToAccount, readLegacy } from './migrate';
-import { deletePhoto, photoLinks, uploadPhoto, type PickedPhoto } from './photos';
+import { deletePhoto, photoLinks, uploadPhoto, uploadPicture, type PickedPhoto } from './photos';
 import { COMMUNITY_OWNER, SEED_ISMS, SEED_LOVED_ONES } from './seed';
 import { byTarget, knowsSharer, targetKey, type Circle } from './social';
 import { supabase } from './supabase';
@@ -137,8 +137,9 @@ interface Store {
   /** `photo`: a new photo, `null` to remove it, or undefined to leave it. */
   updateLovedOne: (id: string, patch: Partial<LovedOneInput>, photo?: PickedPhoto | null) => Promise<void>;
   deleteLovedOne: (id: string) => Promise<void>;
-  addIsm: (input: IsmInput) => Promise<Ism>;
-  updateIsm: (id: string, patch: Partial<IsmInput>) => Promise<void>;
+  addIsm: (input: IsmInput, picture?: PickedPhoto) => Promise<Ism>;
+  /** `picture`: a new picture, `null` to take it off, or undefined to leave it. */
+  updateIsm: (id: string, patch: Partial<IsmInput>, picture?: PickedPhoto | null) => Promise<void>;
   deleteIsm: (id: string) => Promise<void>;
   /** Returns false when the person has to sign in first. */
   toggleSaved: (ismId: string) => boolean;
@@ -215,6 +216,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return list.map((l) => (l.photoPath ? { ...l, photoUri: links.get(l.photoPath) } : l));
   }, []);
 
+  const withPictures = useCallback(async (list: Ism[]) => {
+    const links = await photoLinks(list.flatMap((i) => (i.picturePath ? [i.picturePath] : [])));
+    return list.map((i) => (i.picturePath ? { ...i, pictureUri: links.get(i.picturePath) } : i));
+  }, []);
+
   // Only the newest load may update the screen, so a slow one from before a sign-out can't win.
   const latestLoad = useRef(0);
   const lastLoadedAt = useRef(0);
@@ -253,7 +259,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             return [];
           })
         : Promise.resolve([]);
-      const [withLinks, others] = await Promise.all([withPhotos(data.lovedOnes), namesLoad]);
+      const [withLinks, ismsWithLinks, others] = await Promise.all([
+        withPhotos(data.lovedOnes),
+        withPictures(data.isms),
+        namesLoad,
+      ]);
       const waiting = friends?.isAdmin
         ? await db.contentToReview().then(
             (items) => items.length,
@@ -266,7 +276,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return;
       }
       setLovedOnes(withLinks);
-      setIsms(data.isms);
+      setIsms(ismsWithLinks);
       setSavedIds(data.savedIsmIds);
       setLikes(data.likes);
       setComments(data.comments);
@@ -294,7 +304,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setLoaded(true);
       }
     }
-  }, [userId, withPhotos]);
+  }, [userId, withPhotos, withPictures]);
 
   // Coming back to the app after a while picks up what friends shared in the meantime.
   useEffect(() => {
@@ -510,33 +520,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       deleteLovedOne: async (id) => {
-        requireUser();
+        const me = requireUser();
         const old = byId.get(id);
+        const pictures = isms.filter((i) => i.lovedOneId === id && i.ownerId === me && i.picturePath);
         await db.removeLovedOne(id);
         await deletePhoto(old?.photoPath);
+        for (const i of pictures) await deletePhoto(i.picturePath);
         changedHere();
         setLovedOnes((list) => list.filter((l) => l.id !== id));
         setIsms((list) => list.filter((i) => i.lovedOneId !== id));
       },
 
-      addIsm: async (input) => {
-        requireUser();
-        const created = await db.insertIsm(input);
+      addIsm: async (input, picture) => {
+        const owner = requireUser();
+        const saved = picture ? await uploadPicture(owner, picture) : undefined;
+        const created = await db.insertIsm(saved ? { ...input, picture: saved } : input).catch(async (e: unknown) => {
+          await deletePhoto(saved?.path);
+          throw e;
+        });
+        const [withPicture] = await withPictures([created]);
         changedHere();
-        setIsms((list) => [created, ...list]);
-        return created;
+        setIsms((list) => [withPicture, ...list]);
+        return withPicture;
       },
 
-      updateIsm: async (id, patch) => {
-        requireUser();
-        const updated = await db.patchIsm(id, patch);
+      updateIsm: async (id, patch, picture) => {
+        const owner = requireUser();
+        const old = isms.find((i) => i.id === id);
+        const saved = picture ? await uploadPicture(owner, picture) : picture;
+        const updated = await db.patchIsm(id, saved === undefined ? patch : { ...patch, picture: saved }).catch(
+          async (e: unknown) => {
+            await deletePhoto(saved?.path);
+            throw e;
+          },
+        );
+        if (saved !== undefined && old?.picturePath) await deletePhoto(old.picturePath);
+        const [withPicture] = await withPictures([updated]);
         changedHere();
-        setIsms((list) => list.map((i) => (i.id === id ? updated : i)));
+        setIsms((list) => list.map((i) => (i.id === id ? withPicture : i)));
       },
 
       deleteIsm: async (id) => {
-        requireUser();
+        const me = requireUser();
+        const old = isms.find((i) => i.id === id);
         await db.removeIsm(id);
+        // Its author's to delete; what someone else added stays in their folder, where nobody else can open it.
+        if (old?.picturePath && old.ownerId === me) await deletePhoto(old.picturePath);
         changedHere();
         setIsms((list) => list.filter((i) => i.id !== id));
         setSavedIds((list) => list.filter((s) => s !== id));
@@ -633,7 +662,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       loadReviewItems: async () => {
         const items = await db.contentToReview();
         setReviewCount(items.length);
-        return items;
+        // Reviewers can open the pictures of what's waiting for them.
+        const links = await photoLinks(items.flatMap((i) => (i.picturePath ? [i.picturePath] : [])));
+        return items.map((i) => (i.picturePath ? { ...i, pictureUri: links.get(i.picturePath) } : i));
       },
 
       review: async (item, allow) => {
@@ -672,6 +703,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     refresh,
     requireUser,
     withPhotos,
+    withPictures,
   ]);
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;

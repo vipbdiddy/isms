@@ -2,7 +2,7 @@
 
 A mobile app for keeping the sayings — the "isms" — of people you've lost, and finding the right one when you need it.
 
-- **Loved ones** – add the people you miss with a photo and their obituary, then the things they always used to say (quotes) and longer memories about them (stories). Each quote or story is seen by the same people as its loved one, or by whoever you choose for it: just you, your friends, one or more of your groups, or everyone (people it reaches who can't see the loved one see just their name and photo with it). The people who can see a loved one can add their own stories and quotes to them (the owner can turn this off and remove anything added), and "Invite someone who knew them" sends a link to their page. When someone adds a person who's already here (same name and years, or the same obituary), the app asks "Is this who you're looking for?".
+- **Loved ones** – add the people you miss with a photo and their obituary, then the things they always used to say (quotes) and longer memories about them (stories), each with a picture if you like. Each quote or story (and its picture) is seen by the same people as its loved one, or by whoever you choose for it: just you, your friends, one or more of your groups, or everyone (people it reaches who can't see the loved one see just their name and photo with it). The people who can see a loved one can add their own stories and quotes to them (the owner can turn this off and remove anything added), and "Invite someone who knew them" sends a link to their page. When someone adds a person who's already here (same name and years, or the same obituary), the app asks "Is this who you're looking for?".
 - **Ask** – describe what you're going through ("my brother wants to borrow money again") or pick a situation, and get the sayings that fit.
 - **Browse** – search everything, and filter by topic and by quotes, stories, or both.
 - **Home** – why Isms exists (Bryce's story), the three things to do (add a loved one, share a story or quote, invite someone who knew them), "Whose wisdom are you looking for today?" with Ask and the topics, then one saying a day, the latest memories from you, your friends and your groups, and everything you've saved (the bookmark).
@@ -46,7 +46,8 @@ Expo (React Native) + Expo Router, TypeScript.
 | `src/lib/share.ts` | Sharing a message (or copying it, in browsers that can't share), and opening web pages |
 | `src/app/group/[id].tsx` | A group: what's shared with it, members, invitations, leaving |
 | `src/app/person/[id].tsx` | Someone's profile |
-| `src/lib/photos.ts` | Picking a photo and keeping a copy on the device |
+| `src/lib/photos.ts` | Picking a loved one's photo or a picture for a quote or story, making it smaller, and storing it |
+| `src/app/picture.tsx` | A quote's or story's picture, full size |
 | `src/lib/advice.ts` | Who can see what, the home feed, and matching a situation to sayings |
 | `src/lib/social.ts` | Likes and comments by what they're on, and whose names and profiles you see |
 | `src/lib/duplicates.ts` | Spotting a loved one who's already here ("Is this who you're looking for?") |
